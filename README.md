@@ -112,8 +112,16 @@ Only one owner per beta workspace is allowed by design.
 
 ## Data
 
-Local JSON store in `data/curro.json` (single beta workspace `ws_curro_beta`)
-powers the app today. The production schema is migrated and verified:
+One workspace snapshot (`ws_curro_beta`), two backends:
+
+- **Local development** uses `data/curro.json`.
+- **Vercel/production** uses `public.workspace_state` in Supabase Postgres. The
+  table is server-only, RLS is enabled with no policies, and `anon` /
+  `authenticated` are revoked. On Vercel the app converts the direct
+  `DATABASE_URL` (`db.<ref>.supabase.co`, IPv6-only) to the IPv4 Supavisor
+  pooler; override with `SUPABASE_DB_POOLER_URL` if the project region differs.
+
+The tenant schema is migrated and verified:
 
 ```bash
 npm run db:migrate     # apply pending supabase/migrations/* (idempotent)
