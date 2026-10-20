@@ -1,6 +1,6 @@
 "use server";
 
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient, siteOrigin, supabaseCredentials } from "./supabase-server";
 
@@ -18,7 +18,14 @@ export async function signInWithGoogle(formData: FormData): Promise<void> {
   if (!supabase) redirect("/signin?error=google-config");
 
   const host = headers().get("x-forwarded-host") ?? headers().get("host");
-  const redirectTo = `${siteOrigin(host)}/auth/callback?next=${encodeURIComponent(next)}`;
+  cookies().set("curro_auth_next", next, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 10 * 60
+  });
+  const redirectTo = `${siteOrigin(host)}/auth/callback`;
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {

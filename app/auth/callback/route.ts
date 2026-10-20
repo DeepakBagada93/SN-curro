@@ -10,7 +10,7 @@ function safeNext(raw: string | null): string {
 
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
-  const next = safeNext(request.nextUrl.searchParams.get("next"));
+  const next = safeNext(request.nextUrl.searchParams.get("next") ?? request.cookies.get("curro_auth_next")?.value ?? null);
   const creds = supabaseCredentials();
   if (!code || !creds) {
     return NextResponse.redirect(new URL("/signin?error=google-code", request.url));
@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
   const { data, error } = await supabase.auth.exchangeCodeForSession(code);
   const email = data.user?.email?.toLowerCase();
   if (error || !email) {
+    console.warn("[auth/callback] code exchange failed:", error?.message ?? "no email on user");
     return withCookies(NextResponse.redirect(new URL("/signin?error=google-code", request.url)));
   }
 
@@ -72,6 +73,7 @@ export async function GET(request: NextRequest) {
   }
 
   const response = withCookies(NextResponse.redirect(new URL(next, request.url)));
+  response.cookies.delete("curro_auth_next");
   response.cookies.set(SESSION_COOKIE, sessionToken(email), {
     httpOnly: true,
     sameSite: "lax",
