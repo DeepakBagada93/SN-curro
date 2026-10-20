@@ -8,7 +8,7 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swa
 const fraunces = Fraunces({ subsets: ["latin"], variable: "--font-display", display: "swap" });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://curro.example.com"),
+  metadataBase: new URL("https://curro.in"),
   title: { default: "Curro — the Agency Knowledge OS", template: "%s · Curro" },
   description: "Approved client knowledge, month planning, claim-checked LinkedIn posts, X threads, reel scripts and SEO articles, client review links and a publishing calendar. Built for SEO and content agencies.",
   openGraph: { title: "Curro — the Agency Knowledge OS", description: "One approved knowledge brain per client. Plan, draft, check every claim, get client approval and publish — in one workspace.", type: "website" }

@@ -54,7 +54,7 @@ copy library in `lib/content.ts`.
 | `/how-it-works` | Full 6-step loop + six refusal guardrails |
 | `/pricing` | Starter vs Pro plans, comparison table, guarantee |
 | `/request-access` → `/signup` | Old beta gate redirects to open signup |
-| `/signup` · `/signin` | Open auth: email + scrypt password, HMAC session, guarded app routes |
+| `/signup` · `/signin` | Google OAuth via Supabase, plus email + password fallback |
 | `/getting-started` | Live 5-step onboarding checklist |
 | `/history` | Workspace timeline: runs, drafts, approvals, editorial actions (filter + search) |
 | `/runs/[id]` | Run detail: states, warnings, signals, sources, cost |
@@ -74,15 +74,41 @@ copy library in `lib/content.ts`.
 `POST /api/research-runs` (idempotent) · `POST /api/content-assets`
 (requires explicit angle + approved memory) · `GET /api/usage`.
 
-## Auth (local beta)
+## Auth
 
-Email + scrypt-hashed password in the workspace file, HMAC-signed session
-cookie (`lib/session.ts`), Edge-safe middleware guard on all app + export
-routes. Export endpoints: `/api/export/draft/[id]` (.md),
-`/api/export/brief/[runId]` (.md pack), `/api/export/workspace` (JSON,
-password hash redacted). Token counts are estimated (~4 chars/token) until
-live OpenRouter capture (#43). Supabase Auth replaces this module on cutover
-— passwords will require a reset.
+Two paths, one workspace session:
+
+- **Google OAuth** via Supabase Auth and `@supabase/ssr`. The browser is sent
+  to `/auth/callback`, where the PKCE code is exchanged, the local workspace
+  owner is created/linked, and an HMAC session cookie is issued.
+- **Email + password** remains for local development and existing beta owners
+  (scrypt hash, same HMAC session). Google-only accounts store no password.
+
+Edge-safe middleware guards every app and export route. Export endpoints:
+`/api/export/draft/[id]` (.md), `/api/export/brief/[runId]` (.md pack),
+`/api/export/workspace` (JSON, password hash redacted).
+
+### Supabase + Google setup
+
+1. **Google Cloud Console → Credentials → OAuth client (Web application)**
+   - Authorized JavaScript origin: `https://curro.in`
+   - Authorized redirect URI: `https://lynansdsuxvxkuhakjch.supabase.co/auth/v1/callback`
+2. **Supabase Dashboard → Authentication → Providers → Google**: enable it and
+   paste the Google Client ID + Client Secret.
+3. **Supabase Dashboard → Authentication → URL Configuration**
+   - Site URL: `https://curro.in`
+   - Redirect URLs:
+     - `https://curro.in/auth/callback`
+     - `https://www.curro.in/auth/callback`
+     - `http://localhost:3001/auth/callback`
+     - `http://localhost:3000/auth/callback`
+4. **Environment**: `NEXT_PUBLIC_SITE_URL=https://curro.in`,
+   `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
+5. First Google login creates the workspace owner. Later logins must use the
+   same email; a different Google account is rejected until multi-user
+   workspaces land.
+
+Only one owner per beta workspace is allowed by design.
 
 ## Data
 

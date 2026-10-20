@@ -16,7 +16,7 @@ export default async function AccountPage() {
       <div>
         <p className="eyebrow">Settings</p>
         <h1 className="h-display mt-1 text-3xl md:text-4xl">Account.</h1>
-        <p className="prose-muted mt-1 text-sm">Your workspace identity. Passwords move to managed auth on the Supabase cutover — you&apos;ll set a fresh one then.</p>
+        <p className="prose-muted mt-1 text-sm">Your workspace identity. {db.profile?.authProvider === "google" ? "Signed in with Google via Supabase Auth — no password is stored for this account." : "Signed in with email and password. Google sign-in can be linked with the same email."}</p>
       </div>
       <form action={updateProfile} className="card space-y-4">
         <div><label className="label" htmlFor="ac-name">Display name</label><input id="ac-name" name="name" className="input" defaultValue={me.name} minLength={2} maxLength={80} /></div>

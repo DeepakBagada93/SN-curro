@@ -184,7 +184,10 @@ export const BETA_ALLOWANCE = { briefs: 8, drafts: 24 };
 export interface Profile {
   name: string;
   email: string;
-  passwordHash: string; // scrypt, local-beta only — reset on Supabase cutover
+  passwordHash?: string; // absent for Google-only accounts
+  authProvider?: "password" | "google";
+  supabaseUserId?: string;
+  avatarUrl?: string;
   createdAt: string;
 }
 

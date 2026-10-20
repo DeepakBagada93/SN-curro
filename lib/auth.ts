@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { loadDB, saveDB, audit, nowIso } from "./store";
 import { SESSION_COOKIE, hashPassword, checkPassword, sessionToken, verifySessionToken } from "./session";
+import { createSupabaseServerClient } from "./supabase-server";
 
 // Local-beta auth actions (TODO #39 frontend-first). Email + scrypt-hashed
 // password in the workspace file; HMAC session cookie. On the Supabase
@@ -26,7 +27,7 @@ export async function signUp(formData: FormData): Promise<{ error?: string }> {
   if (db.profile) return { error: "This workspace already has an owner. Sign in instead." };
   db.profile = {
     name: (parsed.data.name ?? email.split("@")[0]).slice(0, 80),
-    email, passwordHash: hashPassword(parsed.data.password), createdAt: nowIso()
+    email, passwordHash: hashPassword(parsed.data.password), authProvider: "password", createdAt: nowIso()
   };
   await audit(db, "auth.signed_up", "profile", email);
   await saveDB(db);
@@ -39,7 +40,7 @@ export async function signIn(formData: FormData): Promise<{ error?: string }> {
   if (!parsed.success) return { error: "Enter your email and password." };
   const db = await loadDB();
   const email = parsed.data.email.toLowerCase();
-  if (!db.profile || db.profile.email !== email || !checkPassword(parsed.data.password, db.profile.passwordHash)) {
+  if (!db.profile || db.profile.email !== email || !db.profile.passwordHash || !checkPassword(parsed.data.password, db.profile.passwordHash)) {
     return { error: "No account matches those credentials on this workspace." };
   }
   await audit(db, "auth.signed_in", "profile", email);
@@ -49,6 +50,8 @@ export async function signIn(formData: FormData): Promise<{ error?: string }> {
 }
 
 export async function signOut(): Promise<void> {
+  const supabase = createSupabaseServerClient();
+  if (supabase) await supabase.auth.signOut().catch(() => null);
   cookies().delete(SESSION_COOKIE);
   redirect("/signin");
 }
