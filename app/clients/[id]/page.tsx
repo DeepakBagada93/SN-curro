@@ -16,7 +16,7 @@ import {
   initials,
   knowledgeStats
 } from "@/lib/clients";
-import type { KnowledgeKind, KnowledgeStatus, PlanItemStatus } from "@/lib/types";
+import type { KnowledgeItem, KnowledgeKind, KnowledgeStatus, PlanItemStatus } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -175,6 +175,73 @@ async function approveAllCandidates(
   } catch (err: unknown) {
     const error = err instanceof Error ? err.message : "Failed to approve candidates";
     return { ok: false, count: 0, error };
+  }
+}
+
+async function updateKnowledgeAction(
+  clientId: string,
+  id: string,
+  input: {
+    kind?: KnowledgeKind;
+    title: string;
+    body: string;
+    sourceUrl?: string | null;
+    tags?: string[];
+    provenance?: string;
+    status?: KnowledgeStatus;
+  }
+): Promise<{ ok: boolean; item?: KnowledgeItem; error?: string }> {
+  "use server";
+  try {
+    const { loadDB: l, saveDB, audit, nowIso } = await import("@/lib/store");
+    const { KnowledgeUpdateSchema } = await import("@/lib/clients");
+    const parsed = KnowledgeUpdateSchema.safeParse(input);
+    if (!parsed.success) {
+      return { ok: false, error: parsed.error.errors.map((e) => e.message).join(", ") };
+    }
+    const db = await l();
+    const item = db.knowledgeItems.find((k) => k.id === id && k.clientId === clientId);
+    if (!item) return { ok: false, error: "Knowledge item not found." };
+    const t = nowIso();
+    if (parsed.data.kind) item.kind = parsed.data.kind;
+    if (parsed.data.title) item.title = parsed.data.title;
+    if (parsed.data.body) item.body = parsed.data.body;
+    if (parsed.data.sourceUrl !== undefined) item.sourceUrl = parsed.data.sourceUrl || null;
+    if (parsed.data.tags) item.tags = parsed.data.tags;
+    if (parsed.data.provenance) item.provenance = parsed.data.provenance;
+    if (parsed.data.status) {
+      item.status = parsed.data.status;
+      if (parsed.data.status === "approved" && !item.approvedAt) item.approvedAt = t;
+    }
+    item.updatedAt = t;
+    await audit(db, "knowledge.updated", "knowledge_item", id);
+    await saveDB(db);
+    revalidatePath(`/clients/${clientId}`);
+    return { ok: true, item };
+  } catch (err: unknown) {
+    const error = err instanceof Error ? err.message : "Failed to update item";
+    return { ok: false, error };
+  }
+}
+
+async function deleteKnowledgeAction(
+  clientId: string,
+  id: string
+): Promise<{ ok: boolean; error?: string }> {
+  "use server";
+  try {
+    const { loadDB: l, saveDB, audit } = await import("@/lib/store");
+    const db = await l();
+    const index = db.knowledgeItems.findIndex((k) => k.id === id && k.clientId === clientId);
+    if (index === -1) return { ok: false, error: "Knowledge item not found." };
+    db.knowledgeItems.splice(index, 1);
+    await audit(db, "knowledge.deleted", "knowledge_item", id);
+    await saveDB(db);
+    revalidatePath(`/clients/${clientId}`);
+    return { ok: true };
+  } catch (err: unknown) {
+    const error = err instanceof Error ? err.message : "Failed to delete item";
+    return { ok: false, error };
   }
 }
 
@@ -396,6 +463,8 @@ export default async function ClientDetailPage({
           clientId={client.id}
           onUpdateStatus={setKnowledgeStatus}
           onApproveAll={approveAllCandidates}
+          onUpdateItem={updateKnowledgeAction}
+          onDeleteItem={deleteKnowledgeAction}
         />
 
         <aside className="space-y-4 xl:sticky xl:top-4 xl:self-start">

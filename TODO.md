@@ -36,6 +36,18 @@ Eliminate synthetic mock/demo seeds, connect the live OpenRouter AI inference pi
   - Built-in website metadata and content scraper (`lib/crawler.ts`): Paste any client URL or blog post to auto-extract title, meta description, and key factual sentences directly into candidate knowledge cards.
   - AI extraction via OpenRouter cheap tier or fallback heuristic parser.
   - One-click approval flow for newly extracted facts.
+- [x] **2.4 Client Knowledge Edit & Update Lifecycle**
+  - Interactive Edit Modal (`KnowledgeBrainManager`): In-place editing of title, content body, kind, source URL, tags, provenance, and status.
+  - Character validation (title ≥ 3 chars, body ≥ 10 chars) with live optimistic UI reflection.
+  - Server action `updateKnowledgeAction` with timestamped `knowledge.updated` audit logging.
+- [x] **2.5 Permanent Fact Deletion & Clean-up**
+  - Two-step safety confirmation (`Delete? Yes / No`) preventing accidental removals.
+  - Instant optimistic UI removal with rollback resilience if server rejects.
+  - Server action `deleteKnowledgeAction` with `knowledge.deleted` audit logging.
+- [x] **2.6 Instant Zero-Latency Search & Bulk Approvals**
+  - Instant client-side search across title, content body, tags, and provenance with real-time matching.
+  - Fast status filter tabs (`All`, `Approved`, `Awaiting Review`, `Archived`) with live count badges.
+  - One-click bulk action `✓ Approve All Candidates (N)` for rapid review of crawled facts.
 
 ---
 
@@ -117,4 +129,24 @@ Eliminate synthetic mock/demo seeds, connect the live OpenRouter AI inference pi
   - Local MCP Server endpoint (`/api/mcp`) documentation and API key generation.
 - [x] **9.3 Quality, Responsiveness & Verification**
   - Comprehensive TypeScript typing check (`tsc --noEmit`) clean with zero errors.
-  - Unit test suite (`vitest run`) 25/25 tests passing in <400ms.
+  - Unit test suite (`vitest run`) 27/27 tests passing in <400ms.
+
+---
+
+## Phase 10: User Dashboard Audit & AI Task Verification
+- [x] **10.1 User Dashboard Knowledge Fact Management**
+  - Audited client knowledge brain on `/clients/[id]`.
+  - Implemented missing Edit, Update, and Delete operations with validation schemas.
+  - Replaced slow server GET roundtrips with instant client-side filtering and optimistic updates.
+  - Added visual progress feedback (`Approving…`, `Archiving…`, `Restoring…`, `Saving…`, `Deleting…`).
+- [x] **10.2 AI Ingestion Crawler Verification**
+  - Repaired OpenRouter JSON extraction to support array payloads, markdown fences, and entity decoding.
+  - Added URL auto-normalization (`https://` prefix) and robust network error reporting.
+  - Verified live fact extraction on production targets (`https://saasnext.in/`).
+- [x] **10.3 AI Studio & Claim Ledger Verification**
+  - Verified OpenRouter prompt structure, multi-format drafting (LinkedIn, Reel scripts, X threads, Articles).
+  - Added animated progress loaders (`SubmitButton`) to Studio draft generation, draft approval, and calendar creation.
+  - Verified Claim Ledger citations (`[factual]`, `[opinion]`, `[unsupported]`) with automatic unsupported outcome warnings.
+- [x] **10.4 30-Day Planner & Brief AI Tasks**
+  - Verified deterministic draft builder from approved client knowledge only.
+  - Verified parallel search / manual brief retrieval with progress feedback.

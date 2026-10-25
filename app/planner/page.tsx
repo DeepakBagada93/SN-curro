@@ -5,6 +5,7 @@ import { CHANNEL_LABELS, PLAN_ITEM_STATUSES, PLAN_STATUS_BADGE, knowledgeStats }
 import { monthKey, monthLabel, shiftMonth } from "@/lib/agency";
 import { buildCalendarDrafts } from "@/lib/planner";
 import { EmptyState } from "@/components/ui";
+import { SubmitButton } from "@/components/submit-button";
 import type { PlanItemStatus } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -204,7 +205,9 @@ export default async function PlannerPage({
                 <h3 className="h-display mt-4 text-lg">No plan for {monthLabel(month)}.</h3>
                 <p className="prose-muted mt-1 max-w-md text-sm">Generate a 30-day skeleton from {ks.approved} approved knowledge items, or add one item manually.</p>
                 <form action={generateCalendar.bind(null, client.id, month)} className="mt-4">
-                  <button className="btn btn-accent" type="submit">Generate 30-day calendar</button>
+                  <SubmitButton pendingText="Generating 30-day calendar with AI…" className="btn btn-accent">
+                    Generate 30-day calendar
+                  </SubmitButton>
                 </form>
               </div>
             </div>

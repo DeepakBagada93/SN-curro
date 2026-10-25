@@ -97,6 +97,16 @@ export const KnowledgeCreateSchema = z.object({
   status: z.enum(["approved", "candidate"]).optional().default("candidate")
 });
 
+export const KnowledgeUpdateSchema = z.object({
+  kind: z.enum(KNOWLEDGE_KINDS).optional(),
+  title: z.string().trim().min(3, "Title needs at least 3 characters").max(160).optional(),
+  body: z.string().trim().min(10, "Add at least one usable sentence").max(5000).optional(),
+  sourceUrl: z.string().trim().max(500).optional().nullable(),
+  tags: z.array(z.string().trim().max(30)).max(8).optional(),
+  provenance: z.string().trim().max(160).optional(),
+  status: z.enum(["approved", "candidate", "archived"]).optional()
+});
+
 export const PlanItemCreateSchema = z.object({
   title: z.string().trim().min(3, "Title needs at least 3 characters").max(200),
   channel: z.enum(CHANNELS),

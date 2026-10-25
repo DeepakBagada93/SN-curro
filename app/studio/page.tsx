@@ -6,6 +6,7 @@ import { generateStudioAsset } from "@/lib/studio-provider";
 import { PLAN_CATALOG, STUDIO_FORMATS, badgeForAssetStatus, formatChannel, formatForChannel, formatLabel, generationsUsed, planLimit } from "@/lib/agency";
 import { CHANNEL_LABELS, knowledgeStats } from "@/lib/clients";
 import { EmptyState } from "@/components/ui";
+import { SubmitButton } from "@/components/submit-button";
 import type { AssetFormat, ClaimEntry } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -185,7 +186,12 @@ export default async function StudioPage({
                   ))}
                 </div>
               </fieldset>
-              <button className="btn btn-accent w-full" type="submit">Generate {formatSpec.label.toLowerCase()}</button>
+              <SubmitButton
+                pendingText={`Generating ${formatSpec.label.toLowerCase()} with AI…`}
+                className="btn btn-accent w-full"
+              >
+                Generate {formatSpec.label.toLowerCase()}
+              </SubmitButton>
               <p className="text-[11px] text-muted-foreground">Output lands in review, never published. Unsupported outcomes stay visible until edited.</p>
             </form>
           )}

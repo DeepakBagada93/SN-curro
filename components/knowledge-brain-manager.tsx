@@ -18,7 +18,9 @@ export function KnowledgeBrainManager({
   initialItems,
   clientId,
   onUpdateStatus,
-  onApproveAll
+  onApproveAll,
+  onUpdateItem,
+  onDeleteItem
 }: {
   initialItems: KnowledgeItem[];
   clientId: string;
@@ -30,14 +32,48 @@ export function KnowledgeBrainManager({
   onApproveAll?: (
     clientId: string
   ) => Promise<{ ok: boolean; count: number; error?: string }>;
+  onUpdateItem?: (
+    clientId: string,
+    itemId: string,
+    input: {
+      kind?: KnowledgeKind;
+      title: string;
+      body: string;
+      sourceUrl?: string | null;
+      tags?: string[];
+      provenance?: string;
+      status?: KnowledgeStatus;
+    }
+  ) => Promise<{ ok: boolean; item?: KnowledgeItem; error?: string }>;
+  onDeleteItem?: (
+    clientId: string,
+    itemId: string
+  ) => Promise<{ ok: boolean; error?: string }>;
 }) {
   const [items, setItems] = useState<KnowledgeItem[]>(initialItems);
   const [searchQuery, setSearchQuery] = useState("");
   const [kindFilter, setKindFilter] = useState<string>("");
   const [statusTab, setStatusTab] = useState<"all" | KnowledgeStatus>("all");
-  const [pendingMap, setPendingMap] = useState<Record<string, KnowledgeStatus | null>>({});
+  const [pendingMap, setPendingMap] = useState<Record<string, string | null>>({});
   const [bulkApproving, setBulkApproving] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  // Edit Modal State
+  const [editingItem, setEditingItem] = useState<KnowledgeItem | null>(null);
+  const [editForm, setEditForm] = useState({
+    title: "",
+    body: "",
+    kind: "brand_fact" as KnowledgeKind,
+    sourceUrl: "",
+    tags: "",
+    provenance: "",
+    status: "candidate" as KnowledgeStatus
+  });
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  // Delete Confirmation State
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
   const [, startTransition] = useTransition();
 
   // Counts
@@ -62,15 +98,8 @@ export function KnowledgeBrainManager({
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return items.filter((item) => {
-      // Status tab filter
-      if (statusTab !== "all" && item.status !== statusTab) {
-        return false;
-      }
-      // Kind filter
-      if (kindFilter && item.kind !== kindFilter) {
-        return false;
-      }
-      // Search query filter
+      if (statusTab !== "all" && item.status !== statusTab) return false;
+      if (kindFilter && item.kind !== kindFilter) return false;
       if (q) {
         const text = `${item.title} ${item.body} ${item.tags.join(" ")} ${item.provenance}`.toLowerCase();
         if (!text.includes(q)) return false;
@@ -83,7 +112,6 @@ export function KnowledgeBrainManager({
     const originalStatus = item.status;
     const now = new Date().toISOString();
 
-    // 1. Optimistic instant UI update
     setPendingMap((prev) => ({ ...prev, [item.id]: newStatus }));
     setItems((prev) =>
       prev.map((i) =>
@@ -98,13 +126,10 @@ export function KnowledgeBrainManager({
       )
     );
 
-    // 2. Background server execution
     startTransition(async () => {
       try {
         const res = await onUpdateStatus(clientId, item.id, newStatus);
-        if (!res.ok) {
-          throw new Error(res.error || "Update failed");
-        }
+        if (!res.ok) throw new Error(res.error || "Update failed");
         setFeedback({
           type: "success",
           message:
@@ -116,11 +141,8 @@ export function KnowledgeBrainManager({
         });
         setTimeout(() => setFeedback(null), 3000);
       } catch (err: unknown) {
-        // Rollback on failure
         setItems((prev) =>
-          prev.map((i) =>
-            i.id === item.id ? { ...i, status: originalStatus } : i
-          )
+          prev.map((i) => (i.id === item.id ? { ...i, status: originalStatus } : i))
         );
         const errorMsg = err instanceof Error ? err.message : "Action failed";
         setFeedback({ type: "error", message: `Failed to update status: ${errorMsg}` });
@@ -141,7 +163,6 @@ export function KnowledgeBrainManager({
     const now = new Date().toISOString();
 
     setBulkApproving(true);
-    // Optimistic update
     setItems((prev) =>
       prev.map((i) =>
         i.status === "candidate"
@@ -167,6 +188,114 @@ export function KnowledgeBrainManager({
         setBulkApproving(false);
       }
     });
+  };
+
+  const openEditModal = (item: KnowledgeItem) => {
+    setEditingItem(item);
+    setEditForm({
+      title: item.title,
+      body: item.body,
+      kind: item.kind,
+      sourceUrl: item.sourceUrl || "",
+      tags: item.tags.join(", "),
+      provenance: item.provenance || "Agency entry",
+      status: item.status
+    });
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingItem || !onUpdateItem) return;
+
+    const cleanTitle = editForm.title.trim();
+    const cleanBody = editForm.body.trim();
+    if (cleanTitle.length < 3) {
+      setFeedback({ type: "error", message: "Title must be at least 3 characters." });
+      return;
+    }
+    if (cleanBody.length < 10) {
+      setFeedback({ type: "error", message: "Content must be at least 10 characters." });
+      return;
+    }
+
+    const parsedTags = editForm.tags
+      .split(",")
+      .map((t) => t.trim().replace(/^#/, ""))
+      .filter(Boolean)
+      .slice(0, 8);
+
+    const now = new Date().toISOString();
+    const updatedDraft: KnowledgeItem = {
+      ...editingItem,
+      title: cleanTitle,
+      body: cleanBody,
+      kind: editForm.kind,
+      sourceUrl: editForm.sourceUrl.trim() || null,
+      tags: parsedTags,
+      provenance: editForm.provenance.trim() || "Agency entry",
+      status: editForm.status,
+      updatedAt: now,
+      approvedAt: editForm.status === "approved" ? editingItem.approvedAt || now : null
+    };
+
+    setIsSavingEdit(true);
+    // Optimistic update
+    const previous = items;
+    setItems((prev) => prev.map((i) => (i.id === editingItem.id ? updatedDraft : i)));
+
+    try {
+      const res = await onUpdateItem(clientId, editingItem.id, {
+        title: cleanTitle,
+        body: cleanBody,
+        kind: editForm.kind,
+        sourceUrl: editForm.sourceUrl.trim() || null,
+        tags: parsedTags,
+        provenance: editForm.provenance.trim() || "Agency entry",
+        status: editForm.status
+      });
+
+      if (!res.ok) throw new Error(res.error || "Update failed");
+
+      setFeedback({ type: "success", message: `Updated "${cleanTitle.slice(0, 35)}"` });
+      setTimeout(() => setFeedback(null), 3000);
+      setEditingItem(null);
+    } catch (err: unknown) {
+      setItems(previous);
+      const msg = err instanceof Error ? err.message : "Failed to save edits";
+      setFeedback({ type: "error", message: msg });
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleDelete = async (itemId: string) => {
+    if (!onDeleteItem) return;
+    const target = items.find((i) => i.id === itemId);
+    if (!target) return;
+
+    setDeletingId(null);
+    setPendingMap((prev) => ({ ...prev, [itemId]: "deleting" }));
+
+    // Optimistic removal
+    const previous = items;
+    setItems((prev) => prev.filter((i) => i.id !== itemId));
+
+    try {
+      const res = await onDeleteItem(clientId, itemId);
+      if (!res.ok) throw new Error(res.error || "Delete failed");
+      setFeedback({ type: "success", message: `Deleted fact: "${target.title.slice(0, 35)}"` });
+      setTimeout(() => setFeedback(null), 3000);
+    } catch (err: unknown) {
+      setItems(previous);
+      const msg = err instanceof Error ? err.message : "Failed to delete fact";
+      setFeedback({ type: "error", message: msg });
+    } finally {
+      setPendingMap((prev) => {
+        const next = { ...prev };
+        delete next[itemId];
+        return next;
+      });
+    }
   };
 
   return (
@@ -364,7 +493,8 @@ export function KnowledgeBrainManager({
         <div className="anim-list space-y-3">
           {filtered.map((item) => {
             const isPendingThis = pendingMap[item.id] !== undefined;
-            const targetStatus = pendingMap[item.id];
+            const targetAction = pendingMap[item.id];
+            const isConfirmingDelete = deletingId === item.id;
 
             return (
               <article
@@ -384,9 +514,11 @@ export function KnowledgeBrainManager({
                       {item.title}
                     </h3>
                   </div>
-                  <span className={`badge ${STATUS_BADGE[item.status]}`}>
-                    {item.status}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className={`badge ${STATUS_BADGE[item.status]}`}>
+                      {item.status}
+                    </span>
+                  </div>
                 </div>
 
                 <p className="mt-2 whitespace-pre-line text-sm text-muted-foreground leading-relaxed">
@@ -419,13 +551,15 @@ export function KnowledgeBrainManager({
                   </div>
                 )}
 
+                {/* Card Actions Footer */}
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-2.5">
                   <p className="font-mono text-[11px] text-muted-foreground">
                     {item.provenance} · {item.updatedAt.slice(0, 10)}
                     {item.approvedAt ? ` · approved ${item.approvedAt.slice(0, 10)}` : ""}
                   </p>
 
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {/* Approve Button */}
                     {item.status !== "approved" && (
                       <button
                         type="button"
@@ -433,7 +567,7 @@ export function KnowledgeBrainManager({
                         disabled={isPendingThis}
                         className="btn btn-accent btn-sm !px-2.5 !py-1 text-xs"
                       >
-                        {isPendingThis && targetStatus === "approved" ? (
+                        {isPendingThis && targetAction === "approved" ? (
                           <>
                             <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
                             <span>Approving…</span>
@@ -444,6 +578,20 @@ export function KnowledgeBrainManager({
                       </button>
                     )}
 
+                    {/* Edit Button */}
+                    {onUpdateItem && (
+                      <button
+                        type="button"
+                        onClick={() => openEditModal(item)}
+                        disabled={isPendingThis}
+                        className="btn btn-outline btn-sm !px-2.5 !py-1 text-xs"
+                        title="Edit fact details"
+                      >
+                        ✎ Edit
+                      </button>
+                    )}
+
+                    {/* Archive Button */}
                     {item.status !== "archived" && (
                       <button
                         type="button"
@@ -451,7 +599,7 @@ export function KnowledgeBrainManager({
                         disabled={isPendingThis}
                         className="btn btn-outline btn-sm !px-2.5 !py-1 text-xs"
                       >
-                        {isPendingThis && targetStatus === "archived" ? (
+                        {isPendingThis && targetAction === "archived" ? (
                           <>
                             <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
                             <span>Archiving…</span>
@@ -462,6 +610,7 @@ export function KnowledgeBrainManager({
                       </button>
                     )}
 
+                    {/* Restore Button */}
                     {item.status === "archived" && (
                       <button
                         type="button"
@@ -469,7 +618,7 @@ export function KnowledgeBrainManager({
                         disabled={isPendingThis}
                         className="btn btn-outline btn-sm !px-2.5 !py-1 text-xs"
                       >
-                        {isPendingThis && targetStatus === "candidate" ? (
+                        {isPendingThis && targetAction === "candidate" ? (
                           <>
                             <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
                             <span>Restoring…</span>
@@ -479,11 +628,229 @@ export function KnowledgeBrainManager({
                         )}
                       </button>
                     )}
+
+                    {/* Delete Action with Confirmation */}
+                    {onDeleteItem && (
+                      <>
+                        {isConfirmingDelete ? (
+                          <div className="flex items-center gap-1 rounded-lg border border-destructive/40 bg-destructive/10 p-0.5">
+                            <span className="px-1 text-[11px] font-medium text-destructive">
+                              Delete?
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(item.id)}
+                              className="rounded bg-destructive px-1.5 py-0.5 text-[11px] font-bold text-white hover:opacity-90"
+                            >
+                              Yes
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDeletingId(null)}
+                              className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground hover:text-foreground"
+                            >
+                              No
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setDeletingId(item.id)}
+                            disabled={isPendingThis}
+                            className="btn btn-ghost btn-sm !px-2 !py-1 text-xs text-muted-foreground hover:text-destructive"
+                            title="Delete fact permanently"
+                          >
+                            {isPendingThis && targetAction === "deleting" ? (
+                              <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-destructive border-t-transparent" />
+                            ) : (
+                              <span>🗑</span>
+                            )}
+                          </button>
+                        )}
+                      </>
+                    )}
                   </div>
                 </div>
               </article>
             );
           })}
+        </div>
+      )}
+
+      {/* Edit Knowledge Modal */}
+      {editingItem && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="edit-modal-title"
+        >
+          <div className="w-full max-w-xl rounded-2xl border border-border bg-card p-6 shadow-xl animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <div>
+                <p className="eyebrow">Edit fact</p>
+                <h3 id="edit-modal-title" className="h-display text-xl font-bold">
+                  Update Knowledge Item
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingItem(null)}
+                className="rounded-lg p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                aria-label="Close modal"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="mt-4 space-y-3.5">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="label" htmlFor="edit-kind">
+                    Kind
+                  </label>
+                  <select
+                    id="edit-kind"
+                    className="input"
+                    value={editForm.kind}
+                    onChange={(e) =>
+                      setEditForm((prev) => ({ ...prev, kind: e.target.value as KnowledgeKind }))
+                    }
+                  >
+                    {KNOWLEDGE_KINDS.map((k) => (
+                      <option key={k} value={k}>
+                        {KNOWLEDGE_KIND_LABELS[k]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="label" htmlFor="edit-status">
+                    Status
+                  </label>
+                  <select
+                    id="edit-status"
+                    className="input"
+                    value={editForm.status}
+                    onChange={(e) =>
+                      setEditForm((prev) => ({
+                        ...prev,
+                        status: e.target.value as KnowledgeStatus
+                      }))
+                    }
+                  >
+                    <option value="candidate">Candidate (Needs Review)</option>
+                    <option value="approved">Approved (Verified)</option>
+                    <option value="archived">Archived</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="label" htmlFor="edit-title">
+                  Title
+                </label>
+                <input
+                  id="edit-title"
+                  type="text"
+                  className="input"
+                  value={editForm.title}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, title: e.target.value }))}
+                  required
+                  minLength={3}
+                  maxLength={160}
+                />
+              </div>
+
+              <div>
+                <label className="label" htmlFor="edit-body">
+                  Content / Fact Statement
+                </label>
+                <textarea
+                  id="edit-body"
+                  className="input min-h-[120px]"
+                  value={editForm.body}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, body: e.target.value }))}
+                  required
+                  minLength={10}
+                  maxLength={5000}
+                />
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="label" htmlFor="edit-source">
+                    Source URL (optional)
+                  </label>
+                  <input
+                    id="edit-source"
+                    type="text"
+                    className="input"
+                    placeholder="https://client.com/page"
+                    value={editForm.sourceUrl}
+                    onChange={(e) =>
+                      setEditForm((prev) => ({ ...prev, sourceUrl: e.target.value }))
+                    }
+                  />
+                </div>
+
+                <div>
+                  <label className="label" htmlFor="edit-tags">
+                    Tags (comma separated)
+                  </label>
+                  <input
+                    id="edit-tags"
+                    type="text"
+                    className="input"
+                    placeholder="pricing, ai, features"
+                    value={editForm.tags}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, tags: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="label" htmlFor="edit-prov">
+                  Provenance
+                </label>
+                <input
+                  id="edit-prov"
+                  type="text"
+                  className="input"
+                  value={editForm.provenance}
+                  onChange={(e) =>
+                    setEditForm((prev) => ({ ...prev, provenance: e.target.value }))
+                  }
+                  maxLength={160}
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 border-t border-border pt-4">
+                <button
+                  type="button"
+                  onClick={() => setEditingItem(null)}
+                  className="btn btn-outline"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingEdit}
+                  className="btn btn-accent flex items-center gap-1.5"
+                >
+                  {isSavingEdit ? (
+                    <>
+                      <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      <span>Saving changes…</span>
+                    </>
+                  ) : (
+                    <span>Save Changes</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </section>

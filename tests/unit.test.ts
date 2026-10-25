@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { canonicalUrl, scoreSource } from "../lib/research";
 import { canTransition } from "../lib/generation";
-import { slugify, uniqueSlug, knowledgeStats, parseTags, ClientCreateSchema, KnowledgeCreateSchema, PlanItemCreateSchema } from "../lib/clients";
+import { slugify, uniqueSlug, knowledgeStats, parseTags, ClientCreateSchema, KnowledgeCreateSchema, KnowledgeUpdateSchema, PlanItemCreateSchema } from "../lib/clients";
 import { canAssetTransition, claimBlockers, canApproveAsset, PLAN_CATALOG } from "../lib/agency";
 import { buildCalendarDrafts } from "../lib/planner";
 import { createReviewToken, verifyReviewToken } from "../lib/review";
@@ -82,6 +82,22 @@ describe("agency client helpers", () => {
   it("requires a valid ISO publishing date", () => {
     expect(PlanItemCreateSchema.safeParse({ title: "Post", channel: "linkedin", publishDate: "2026-11-03" }).success).toBe(true);
     expect(PlanItemCreateSchema.safeParse({ title: "Post", channel: "linkedin", publishDate: "03/11/2026" }).success).toBe(false);
+  });
+
+  it("validates knowledge updates properly", () => {
+    const valid = KnowledgeUpdateSchema.safeParse({
+      title: "Updated Brand Fact",
+      body: "This is a verified statement with at least 10 characters.",
+      status: "approved",
+      tags: ["pricing", "features"]
+    });
+    expect(valid.success).toBe(true);
+
+    const invalidTitle = KnowledgeUpdateSchema.safeParse({ title: "ab" });
+    expect(invalidTitle.success).toBe(false);
+
+    const invalidBody = KnowledgeUpdateSchema.safeParse({ body: "short" });
+    expect(invalidBody.success).toBe(false);
   });
 });
 
