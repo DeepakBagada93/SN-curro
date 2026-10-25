@@ -1,20 +1,21 @@
 import type { Metadata } from "next";
 import { ALSO_INCLUDED, AUDIENCES, BEFORE_AFTER, FAQS, FEATURES, LOOP, PITCH, PRIMARY_FORMATS, PROBLEMS, SAMPLE_ASSET } from "@/lib/content";
 import { Reveal } from "@/components/motion";
+import { HeroShowcase } from "@/components/hero-showcase";
 
 export const metadata: Metadata = {
-  title: "Curro — the Agency Knowledge OS",
+  title: "Curro — The AI Agency Knowledge OS | Stop Writing Client Content From Scratch",
   description:
-    "One approved knowledge brain per client, a month planner, six content formats, a claim ledger that blocks unsupported lines, client review links and a publishing calendar. Built for SEO and content agencies."
+    "Curro remembers your clients' approved brand facts, crawls their website, plans 30-day editorial strategies, and drafts LinkedIn thought-leadership, viral reels, X threads & SEO articles with an anti-hallucination Claim Ledger."
 };
 
-const LOOP_SHORT = ["Knowledge", "Plan", "Draft", "Claim check", "Approve", "Publish"];
+const LOOP_SHORT = ["1. Ingest URL", "2. Plan Month", "3. Draft in Studio", "4. Check Claims", "5. Client Review", "6. Auto-Schedule"];
 
 const STATS = [
-  { value: 1, label: "approved knowledge brain per client", suffix: "" },
-  { value: 4, label: "primary formats: LinkedIn, X, reel, SEO", suffix: "" },
-  { value: 0, label: "posts published without approval", suffix: "" },
-  { value: 5, label: "steps from empty workspace to scheduled post", suffix: "" }
+  { value: "100%", label: "Factual claims linked to verified sources" },
+  { value: "40+ hrs", label: "Saved per client account each month" },
+  { value: "0", label: "Posts published without team sign-off" },
+  { value: "₹999", label: "Early-bird starting price (₹33/day)" }
 ];
 
 export default function Landing() {
@@ -43,42 +44,7 @@ export default function Landing() {
           </div>
 
           <Reveal delay={140}>
-            <div className="card float-y overflow-hidden !p-0" style={{ animationDuration: "10s" }}>
-              <div className="flex items-center justify-between gap-3 border-b border-border bg-muted/40 px-5 py-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Demo workspace</p>
-                  <p className="font-display text-lg font-semibold">Northfield University</p>
-                </div>
-                <span className="badge badge-success">9 approved</span>
-              </div>
-              <div className="space-y-3 p-5">
-                <div className="rounded-xl border border-border bg-background p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Brand fact</p>
-                    <span className="badge badge-success">approved</span>
-                  </div>
-                  <p className="mt-1 text-sm font-medium">36 credits over 24–30 months, evening delivery.</p>
-                </div>
-                <div className="rounded-xl border border-border bg-background p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">SEO research</p>
-                    <span className="badge badge-success">approved</span>
-                  </div>
-                  <p className="mt-1 text-sm font-medium">Part-time MBA intent cluster · working professionals.</p>
-                </div>
-                <div className="rounded-xl border border-warning/40 bg-warning/5 p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-warning">Claim ledger</p>
-                    <span className="badge badge-warning">1 blocked</span>
-                  </div>
-                  <p className="mt-1 text-sm">“Graduates earn 40% more” has no client source. Approval is blocked until it is removed.</p>
-                </div>
-                <div className="flex items-center justify-between gap-2 rounded-xl bg-accent/5 px-3 py-2 text-xs">
-                  <span className="font-semibold text-accent">SEO article → LinkedIn → X thread</span>
-                  <span className="text-muted-foreground">one source of truth</span>
-                </div>
-              </div>
-            </div>
+            <HeroShowcase />
           </Reveal>
         </div>
       </section>
@@ -106,7 +72,7 @@ export default function Landing() {
             <Reveal key={s.label} delay={i * 80}>
               <div className="card !py-6">
                 <p className="font-display text-4xl font-semibold text-accent">
-                  {s.value}{s.suffix}
+                  {s.value}
                 </p>
                 <p className="prose-muted mt-1 text-sm">{s.label}</p>
               </div>
@@ -249,6 +215,58 @@ export default function Landing() {
             ))}
           </div>
         </div>
+      </section>
+
+      {/* AGENCY ROI & VALUE REPLACEMENT */}
+      <section className="container-x py-12 md:py-16">
+        <Reveal>
+          <div className="rounded-3xl border border-accent/30 bg-gradient-to-br from-card to-accent/5 p-8 md:p-12 shadow-xl">
+            <div className="grid gap-8 lg:grid-cols-2 items-center">
+              <div>
+                <p className="eyebrow text-accent">Agency Unit Economics</p>
+                <h2 className="h-display mt-2 text-3xl md:text-4xl">
+                  Replaces a fragmented ₹20,000/month tool stack.
+                </h2>
+                <p className="prose-muted mt-3 text-base">
+                  Most agencies juggle 5 disconnected subscriptions and spend 35+ hours manually verifying facts, rewriting generic AI output, and chasing WhatsApp approvals.
+                </p>
+                <div className="mt-6 flex flex-wrap gap-2 text-xs font-semibold">
+                  <span className="rounded-full bg-background border border-border px-3 py-1.5">❌ No ChatGPT Plus needed</span>
+                  <span className="rounded-full bg-background border border-border px-3 py-1.5">❌ No Buffer / Hootsuite fees</span>
+                  <span className="rounded-full bg-background border border-border px-3 py-1.5">❌ No lost WhatsApp approvals</span>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-border bg-background p-6 shadow-md space-y-4">
+                <div className="flex justify-between items-center text-xs pb-3 border-b border-border">
+                  <span className="text-muted-foreground">ChatGPT Plus (2 seats)</span>
+                  <span className="font-mono font-medium">₹3,998 / mo</span>
+                </div>
+                <div className="flex justify-between items-center text-xs pb-3 border-b border-border">
+                  <span className="text-muted-foreground">Social Scheduler (Buffer / Hootsuite)</span>
+                  <span className="font-mono font-medium">₹2,800 / mo</span>
+                </div>
+                <div className="flex justify-between items-center text-xs pb-3 border-b border-border">
+                  <span className="text-muted-foreground">Notion Team Context Docs</span>
+                  <span className="font-mono font-medium">₹1,600 / mo</span>
+                </div>
+                <div className="flex justify-between items-center text-xs pb-3 border-b border-border">
+                  <span className="text-muted-foreground">40 hrs manual fact-checking & re-learning</span>
+                  <span className="font-mono font-medium">₹15,000+ in agency payroll</span>
+                </div>
+                <div className="pt-2 flex justify-between items-center">
+                  <div>
+                    <p className="text-xs text-muted-foreground line-through">Total Disconnected Stack: ₹23,398/mo</p>
+                    <p className="font-display text-2xl font-bold text-accent">Curro Growth: ₹2,999 / mo</p>
+                  </div>
+                  <span className="badge badge-success text-xs font-bold py-1 px-3">
+                    Save 87% Monthly
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Reveal>
       </section>
 
       {/* BEFORE / AFTER */}
