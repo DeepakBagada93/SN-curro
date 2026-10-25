@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { loadDB } from "@/lib/store";
+import { CrawlForm } from "@/components/crawl-form";
 import {
   CHANNELS,
   CHANNEL_LABELS,
@@ -74,37 +75,52 @@ async function ingestUrl(clientId: string, formData: FormData) {
   "use server";
   const { loadDB: l, saveDB, audit, uid, nowIso } = await import("@/lib/store");
   const { scrapeUrlForKnowledge } = await import("@/lib/crawler");
-  const url = String(formData.get("crawlUrl") ?? "").trim();
+  let url = String(formData.get("crawlUrl") ?? "").trim();
   if (!url) redirect(`/clients/${clientId}?error=invalid_url`);
+  if (!/^https?:\/\//i.test(url) && url.includes(".")) {
+    url = `https://${url}`;
+  }
+
   const db = await l();
   const client = db.clients.find((c) => c.id === clientId);
-  if (!client) return;
+  if (!client) redirect("/clients");
 
+  let redirectTarget = "";
   try {
     const facts = await scrapeUrlForKnowledge(url);
-    const t = nowIso();
-    for (const f of facts) {
-      db.knowledgeItems.push({
-        id: uid("kn"),
-        workspaceId: client.workspaceId,
-        clientId: client.id,
-        kind: f.kind,
-        title: f.title,
-        body: f.body,
-        sourceUrl: url,
-        status: "candidate",
-        provenance: `Crawled from ${url}`,
-        tags: f.tags,
-        createdAt: t,
-        updatedAt: t,
-        approvedAt: null
-      });
+    if (!facts || facts.length === 0) {
+      redirectTarget = `/clients/${clientId}?error=no_facts_found`;
+    } else {
+      const t = nowIso();
+      for (const f of facts) {
+        db.knowledgeItems.push({
+          id: uid("kn"),
+          workspaceId: client.workspaceId,
+          clientId: client.id,
+          kind: f.kind,
+          title: f.title,
+          body: f.body,
+          sourceUrl: url,
+          status: "candidate",
+          provenance: `Crawled from ${url}`,
+          tags: f.tags,
+          createdAt: t,
+          updatedAt: t,
+          approvedAt: null
+        });
+      }
+      await audit(db, "knowledge.crawled", "client", client.id);
+      await saveDB(db);
+      revalidatePath(`/clients/${clientId}`);
+      redirectTarget = `/clients/${clientId}?success=crawled&count=${facts.length}`;
     }
-    await audit(db, "knowledge.crawled", "client", client.id);
-    await saveDB(db);
-    revalidatePath(`/clients/${clientId}`);
-  } catch {
-    redirect(`/clients/${clientId}?error=crawl_failed`);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "crawl_failed";
+    redirectTarget = `/clients/${clientId}?error=crawl_failed&reason=${encodeURIComponent(msg)}`;
+  }
+
+  if (redirectTarget) {
+    redirect(redirectTarget);
   }
 }
 
@@ -220,7 +236,15 @@ export default async function ClientDetailPage({
   searchParams
 }: {
   params: { id: string };
-  searchParams: { q?: string; kind?: string; status?: string; error?: string };
+  searchParams: {
+    q?: string;
+    kind?: string;
+    status?: string;
+    error?: string;
+    reason?: string;
+    success?: string;
+    count?: string;
+  };
 }) {
   const db = await loadDB();
   const client = db.clients.find((c) => c.id === params.id);
@@ -253,6 +277,12 @@ export default async function ClientDetailPage({
     <div className="space-y-6">
       <p><a href="/clients" className="text-sm font-semibold text-accent hover:underline">← All clients</a></p>
 
+      {searchParams.success === "crawled" && (
+        <p className="alert alert-success">
+          ✨ Successfully crawled page and extracted {searchParams.count ?? "new"} candidate fact{searchParams.count === "1" ? "" : "s"} into the knowledge brain!
+        </p>
+      )}
+
       {searchParams.error && (
         <p className="alert alert-danger">
           {searchParams.error === "knowledge"
@@ -260,10 +290,12 @@ export default async function ClientDetailPage({
             : searchParams.error === "plan"
               ? "Plan item not saved — add a title, channel and publish date."
               : searchParams.error === "crawl_failed"
-                ? "Failed to crawl URL — check that the link is public and accessible."
+                ? `Failed to crawl URL — ${searchParams.reason ? decodeURIComponent(searchParams.reason) : "check that the link is public and accessible."}`
                 : searchParams.error === "invalid_url"
-                  ? "Invalid URL provided — must start with https:// or http://."
-                  : "Client details not saved — check the name and brand colour."}
+                  ? "Invalid URL provided — must be a valid website address (e.g. https://client.com)."
+                  : searchParams.error === "no_facts_found"
+                    ? "No facts could be extracted from this page. Try another URL or add facts manually."
+                    : decodeURIComponent(searchParams.error)}
         </p>
       )}
 
@@ -420,23 +452,11 @@ export default async function ClientDetailPage({
             <p className="mt-1 text-xs text-muted-foreground">
               Paste a website URL or landing page. Curro crawls the page and extracts verified candidate facts automatically.
             </p>
-            <form action={ingestUrl.bind(null, client.id)} className="mt-3 space-y-3">
-              <div>
-                <label className="label" htmlFor="crawlUrl">Target URL</label>
-                <input
-                  id="crawlUrl"
-                  name="crawlUrl"
-                  type="url"
-                  className="input"
-                  placeholder={client.website || "https://client.com/about"}
-                  defaultValue={client.website || ""}
-                  required
-                />
-              </div>
-              <button className="btn btn-accent w-full" type="submit">
-                Extract Facts with AI →
-              </button>
-            </form>
+            <CrawlForm
+              action={ingestUrl.bind(null, client.id)}
+              defaultValue={client.website || ""}
+              placeholder={client.website || "https://client.com/about"}
+            />
           </div>
 
           <div className="card">

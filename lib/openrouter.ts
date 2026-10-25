@@ -119,9 +119,41 @@ export async function chatText(input: {
 
 export function extractJson<T>(text: string): T {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1];
-  const raw = fenced ?? text;
-  const start = raw.indexOf("{");
-  const end = raw.lastIndexOf("}");
-  if (start === -1 || end === -1 || end <= start) throw new Error("Model response did not contain a JSON object.");
-  return JSON.parse(raw.slice(start, end + 1)) as T;
+  const raw = (fenced ?? text).trim();
+
+  // 1. Direct parse attempt
+  try {
+    return JSON.parse(raw) as T;
+  } catch {}
+
+  // 2. Look for arrays [...]
+  const firstBracket = raw.indexOf("[");
+  const lastBracket = raw.lastIndexOf("]");
+  const firstBrace = raw.indexOf("{");
+  const lastBrace = raw.lastIndexOf("}");
+
+  if (firstBracket !== -1 && lastBracket > firstBracket) {
+    if (firstBrace === -1 || firstBracket < firstBrace) {
+      try {
+        return JSON.parse(raw.slice(firstBracket, lastBracket + 1)) as T;
+      } catch {}
+    }
+  }
+
+  // 3. Look for objects {...}
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    try {
+      return JSON.parse(raw.slice(firstBrace, lastBrace + 1)) as T;
+    } catch {}
+  }
+
+  // 4. Look for multiple objects separated by commas without outer brackets:
+  // e.g. { ... }, { ... } -> wrap in [ ... ]
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    try {
+      return JSON.parse(`[${raw.slice(firstBrace, lastBrace + 1)}]`) as T;
+    } catch {}
+  }
+
+  throw new Error("Model response did not contain valid JSON.");
 }

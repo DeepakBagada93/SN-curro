@@ -7,6 +7,7 @@ import { buildCalendarDrafts } from "../lib/planner";
 import { createReviewToken, verifyReviewToken } from "../lib/review";
 import { generateStudioDraft } from "../lib/studio";
 import { scrapeUrlForKnowledge } from "../lib/crawler";
+import { extractJson } from "../lib/openrouter";
 
 describe("canonicalUrl", () => {
   it("strips tracking params and www", () => {
@@ -188,5 +189,12 @@ describe("studio formats", () => {
   it("validates crawler url input", async () => {
     await expect(scrapeUrlForKnowledge("invalid-url")).rejects.toThrow("Invalid URL");
     await expect(scrapeUrlForKnowledge("ftp://example.com")).rejects.toThrow("Invalid URL");
+  });
+
+  it("extracts json from markdown, arrays, objects, and unbracketed lists", () => {
+    expect(extractJson('{"name": "test"}')).toEqual({ name: "test" });
+    expect(extractJson('[{"title": "a"}, {"title": "b"}]')).toEqual([{ title: "a" }, { title: "b" }]);
+    expect(extractJson('```json\n[{"title": "c"}]\n```')).toEqual([{ title: "c" }]);
+    expect(extractJson('{"title": "x"}, {"title": "y"}')).toEqual([{ title: "x" }, { title: "y" }]);
   });
 });
