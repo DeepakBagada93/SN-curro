@@ -6,7 +6,7 @@ import { canAssetTransition, claimBlockers, canApproveAsset, PLAN_CATALOG } from
 import { buildCalendarDrafts } from "../lib/planner";
 import { createReviewToken, verifyReviewToken } from "../lib/review";
 import { generateStudioDraft } from "../lib/studio";
-import { scrapeUrlForKnowledge } from "../lib/crawler";
+import { scrapeUrlForKnowledge, scaffoldStarterBrainFacts, extractFactsFromText } from "../lib/crawler";
 import { extractJson } from "../lib/openrouter";
 
 describe("canonicalUrl", () => {
@@ -212,5 +212,43 @@ describe("studio formats", () => {
     expect(extractJson('[{"title": "a"}, {"title": "b"}]')).toEqual([{ title: "a" }, { title: "b" }]);
     expect(extractJson('```json\n[{"title": "c"}]\n```')).toEqual([{ title: "c" }]);
     expect(extractJson('{"title": "x"}, {"title": "y"}')).toEqual([{ title: "x" }, { title: "y" }]);
+  });
+
+  it("scaffolds a complete starter brain with 4 core pillars", () => {
+    const starterFacts = scaffoldStarterBrainFacts({
+      name: "Acme Cloud",
+      audience: "DevOps engineers",
+      tone: "Concise, technical",
+      summary: "Modern Kubernetes orchestration platform",
+      restrictedClaims: "Never guarantee 100.0% zero downtime",
+      website: "https://acmecloud.io",
+    });
+
+    expect(starterFacts).toHaveLength(4);
+    expect(starterFacts.map((f) => f.kind)).toEqual([
+      "brand_fact",
+      "audience",
+      "writing_guideline",
+      "writing_guideline",
+    ]);
+    expect(starterFacts[0].body).toContain("Modern Kubernetes orchestration platform");
+    expect(starterFacts[1].body).toContain("DevOps engineers");
+    expect(starterFacts[2].body).toContain("Concise, technical");
+    expect(starterFacts[3].body).toContain("Never guarantee 100.0% zero downtime");
+  });
+
+  it("extracts facts from raw text with heuristic fallback", async () => {
+    await expect(extractFactsFromText("short")).rejects.toThrow("Please provide at least 20 characters");
+
+    const rawNotes = `Acme Cloud provides automated multi-cloud failover in under 30 seconds for mission-critical apps.
+Our primary ICP is Director of Infrastructure at series B+ SaaS startups with high uptime SLAs.
+We adhere to strict SOC2 Type II and HIPAA compliance standards across all storage clusters.`;
+
+    const extracted = await extractFactsFromText("Acme Cloud", rawNotes);
+    expect(extracted.length).toBeGreaterThanOrEqual(1);
+    expect(extracted[0]).toHaveProperty("title");
+    expect(extracted[0]).toHaveProperty("body");
+    expect(extracted[0]).toHaveProperty("kind");
+    expect(extracted[0]).toHaveProperty("tags");
   });
 });

@@ -459,33 +459,41 @@ export function KnowledgeBrainManager({
       {filtered.length === 0 ? (
         <div className="card">
           <div className="empty !py-10">
-            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-muted text-2xl" aria-hidden>
-              ❖
+            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-accent/10 text-2xl text-accent" aria-hidden>
+              {items.length === 0 ? "⚡" : "❖"}
             </div>
-            <h3 className="h-display mt-4 text-lg">
+            <h3 className="h-display mt-4 text-xl font-bold">
               {items.length === 0
-                ? "The brain is empty."
+                ? "Build this client's brain in seconds"
                 : searchQuery
                   ? `No facts found matching "${searchQuery}"`
                   : `No items in ${statusTab === "all" ? "this view" : statusTab}.`}
             </h3>
-            <p className="prose-muted mt-1 max-w-md text-sm">
+            <p className="prose-muted mt-2 max-w-md text-sm leading-relaxed">
               {items.length === 0
-                ? "Use the AI Web Ingestion tool on the right to crawl client pages, or add facts manually."
+                ? "Choose any method in the AI Brain Studio on the right: paste messy meeting notes, crawl the client's website, or scaffold a 4-pillar starter brain with 1 click."
                 : "Try adjusting your search query or switching tabs."}
             </p>
-            {(searchQuery || kindFilter || statusTab !== "all") && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearchQuery("");
-                  setKindFilter("");
-                  setStatusTab("all");
-                }}
-                className="btn btn-outline btn-sm mt-4"
-              >
-                Show all knowledge items
-              </button>
+            {items.length === 0 ? (
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs">
+                <span className="badge badge-accent">🪄 AI Notes Extractor</span>
+                <span className="badge badge-accent">⚡ Website Crawler</span>
+                <span className="badge badge-accent">🚀 Starter Template</span>
+              </div>
+            ) : (
+              (searchQuery || kindFilter || statusTab !== "all") && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setKindFilter("");
+                    setStatusTab("all");
+                  }}
+                  className="btn btn-outline btn-sm mt-4"
+                >
+                  Show all knowledge items
+                </button>
+              )
             )}
           </div>
         </div>

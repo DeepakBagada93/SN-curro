@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { loadDB } from "@/lib/store";
 import { CrawlForm } from "@/components/crawl-form";
+import { BrainBuilder } from "@/components/brain-builder";
 import { KnowledgeBrainManager } from "@/components/knowledge-brain-manager";
 import { SubmitButton } from "@/components/submit-button";
 import {
@@ -124,6 +125,98 @@ async function ingestUrl(clientId: string, formData: FormData) {
   if (redirectTarget) {
     redirect(redirectTarget);
   }
+}
+
+async function ingestNotes(clientId: string, formData: FormData) {
+  "use server";
+  const { loadDB: l, saveDB, audit, uid, nowIso } = await import("@/lib/store");
+  const { extractFactsFromText } = await import("@/lib/crawler");
+  const notes = String(formData.get("rawNotes") ?? "").trim();
+  if (!notes || notes.length < 20) {
+    redirect(`/clients/${clientId}?error=invalid_notes`);
+  }
+
+  const db = await l();
+  const client = db.clients.find((c) => c.id === clientId);
+  if (!client) redirect("/clients");
+
+  let redirectTarget = "";
+  try {
+    const facts = await extractFactsFromText(client.name, notes, client.industry);
+    if (!facts || facts.length === 0) {
+      redirectTarget = `/clients/${clientId}?error=no_facts_found`;
+    } else {
+      const t = nowIso();
+      for (const f of facts) {
+        db.knowledgeItems.push({
+          id: uid("kn"),
+          workspaceId: client.workspaceId,
+          clientId: client.id,
+          kind: f.kind,
+          title: f.title,
+          body: f.body,
+          sourceUrl: null,
+          status: "candidate",
+          provenance: "AI extracted from notes",
+          tags: f.tags,
+          createdAt: t,
+          updatedAt: t,
+          approvedAt: null
+        });
+      }
+      await audit(db, "knowledge.extracted_from_notes", "client", client.id);
+      await saveDB(db);
+      revalidatePath(`/clients/${clientId}`);
+      redirectTarget = `/clients/${clientId}?success=crawled&count=${facts.length}`;
+    }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "notes_failed";
+    redirectTarget = `/clients/${clientId}?error=crawl_failed&reason=${encodeURIComponent(msg)}`;
+  }
+
+  if (redirectTarget) {
+    redirect(redirectTarget);
+  }
+}
+
+async function scaffoldStarterBrain(clientId: string) {
+  "use server";
+  const { loadDB: l, saveDB, audit, uid, nowIso } = await import("@/lib/store");
+  const { scaffoldStarterBrainFacts } = await import("@/lib/crawler");
+  const db = await l();
+  const client = db.clients.find((c) => c.id === clientId);
+  if (!client) redirect("/clients");
+
+  const facts = scaffoldStarterBrainFacts(
+    client.name,
+    client.industry,
+    client.summary,
+    client.audience,
+    client.tone
+  );
+
+  const t = nowIso();
+  for (const f of facts) {
+    db.knowledgeItems.push({
+      id: uid("kn"),
+      workspaceId: client.workspaceId,
+      clientId: client.id,
+      kind: f.kind,
+      title: f.title,
+      body: f.body,
+      sourceUrl: null,
+      status: "candidate",
+      provenance: "Starter brain template",
+      tags: f.tags,
+      createdAt: t,
+      updatedAt: t,
+      approvedAt: null
+    });
+  }
+  await audit(db, "knowledge.starter_scaffolded", "client", client.id);
+  await saveDB(db);
+  revalidatePath(`/clients/${clientId}`);
+  redirect(`/clients/${clientId}?success=crawled&count=${facts.length}`);
 }
 
 async function setKnowledgeStatus(
@@ -486,62 +579,15 @@ export default async function ClientDetailPage({
         />
 
         <aside className="space-y-4 xl:sticky xl:top-4 xl:self-start">
-          <div className="card border-accent/30 bg-accent/5">
-            <p className="eyebrow text-accent">⚡ AI Web Ingestion</p>
-            <h2 className="h-display mt-1 text-xl">Ingest Client URL</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Paste a website URL or landing page. Curro crawls the page and extracts verified candidate facts automatically.
-            </p>
-            <CrawlForm
-              action={ingestUrl.bind(null, client.id)}
-              defaultValue={client.website || ""}
-              placeholder={client.website || "https://client.com/about"}
-            />
-          </div>
-
-          <div className="card">
-            <p className="eyebrow">Add knowledge</p>
-            <h2 className="h-display mt-1 text-xl">Teach the brain</h2>
-            <p className="mt-1 text-xs text-muted-foreground">New items start as candidates unless you explicitly approve them.</p>
-            <form action={addKnowledge.bind(null, client.id)} className="mt-3 space-y-3">
-              <div>
-                <label className="label" htmlFor="k-kind">Kind</label>
-                <select id="k-kind" name="kind" className="input" defaultValue="brand_fact">
-                  {KNOWLEDGE_KINDS.map((k) => <option key={k} value={k}>{KNOWLEDGE_KIND_LABELS[k]}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="label" htmlFor="k-title">Title</label>
-                <input id="k-title" name="title" className="input" placeholder="Part-time MBA format" required minLength={3} maxLength={160} />
-              </div>
-              <div>
-                <label className="label" htmlFor="k-body">Approved content</label>
-                <textarea id="k-body" name="body" className="input min-h-[110px]" placeholder="State the fact exactly as it may be used…" required minLength={10} maxLength={5000} />
-              </div>
-              <div>
-                <label className="label" htmlFor="k-source">Source URL (optional)</label>
-                <input id="k-source" name="sourceUrl" className="input" placeholder="https://client.com/page" maxLength={500} />
-              </div>
-              <div>
-                <label className="label" htmlFor="k-tags">Tags (comma separated)</label>
-                <input id="k-tags" name="tags" className="input" placeholder="mba, admissions" maxLength={120} />
-              </div>
-              <div>
-                <label className="label" htmlFor="k-prov">Provenance</label>
-                <input id="k-prov" name="provenance" className="input" defaultValue="Agency entry" maxLength={160} />
-              </div>
-              <div>
-                <label className="label" htmlFor="k-status">On save</label>
-                <select id="k-status" name="status" className="input" defaultValue="candidate">
-                  <option value="candidate">Candidate — needs review</option>
-                  <option value="approved">Approved — I verified this</option>
-                </select>
-              </div>
-              <SubmitButton pendingText="Adding to knowledge brain…" className="btn btn-accent w-full">
-                Add to knowledge brain
-              </SubmitButton>
-            </form>
-          </div>
+          <BrainBuilder
+            clientId={client.id}
+            clientWebsite={client.website}
+            clientIndustry={client.industry}
+            ingestUrlAction={ingestUrl.bind(null, client.id)}
+            ingestNotesAction={ingestNotes.bind(null, client.id)}
+            scaffoldStarterAction={scaffoldStarterBrain.bind(null, client.id)}
+            addManualAction={addKnowledge.bind(null, client.id)}
+          />
 
           <div className="card text-sm">
             <h3 className="font-display text-base font-semibold">Why this is the product</h3>
