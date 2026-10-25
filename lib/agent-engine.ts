@@ -5,6 +5,16 @@ import { generateStudioAsset } from "./studio-provider";
 import { generateCalendarPlan } from "./planner";
 import { STUDIO_FORMATS, formatChannel } from "./agency";
 import type { Client, KnowledgeItem, ContentAsset, ContentVersion, ClaimEntry, AssetFormat, PlanTier } from "./types";
+import {
+  compressKnowledgeContext,
+  visualSkill,
+  brainstormSkill,
+  auditSkill,
+  planSkill,
+  type VisualSkillOutput,
+  type BrainstormAngle,
+  type ContentAuditReport
+} from "./skills";
 
 export type AgentIntentType =
   | "build_brain"
@@ -13,38 +23,24 @@ export type AgentIntentType =
   | "audit_content"
   | "draft_content"
   | "plan_content"
+  | "generate_image"
   | "chat";
 
-export interface BrainstormAngle {
-  id: string;
-  title: string;
-  hook: string;
-  commonTake: string;
-  contrarianAngle: string;
-  evidencePoints: string[];
-  recommendedFormat: AssetFormat;
-}
-
-export interface ContentAuditReport {
-  score: number; // 0 to 100%
-  summary: string;
-  verifiedCount: number;
-  opinionCount: number;
-  unsupportedCount: number;
-  violations: string[];
-  claims: {
-    text: string;
-    kind: "factual" | "opinion" | "unsupported";
-    citations: string[];
-    riskNote?: string;
-  }[];
-}
+export { type BrainstormAngle, type ContentAuditReport };
 
 export interface AgentExecutionResult {
   intent: AgentIntentType;
   replyMessage: string;
   thinkingSteps: string[];
-  activeArtifactType: "brain" | "brainstorm" | "audit" | "draft" | "plan";
+  activeArtifactType: "brain" | "brainstorm" | "audit" | "draft" | "plan" | "image";
+  tokenSavings?: {
+    baselineFactCount: number;
+    compressedFactCount: number;
+    baselineEstimatedTokens: number;
+    compressedEstimatedTokens: number;
+    tokensSaved: number;
+    savingsRatio: number;
+  };
   payload: {
     brainFacts?: KnowledgeItem[];
     angles?: BrainstormAngle[];
@@ -59,16 +55,40 @@ export interface AgentExecutionResult {
       publishDate: string;
       notes: string;
     }[];
+    image?: VisualSkillOutput;
   };
 }
 
 /**
- * Detect user's intent from natural language prompt
+ * Detect user's intent from natural language prompt or slash command
  */
 export function classifyAgentIntent(prompt: string): AgentIntentType {
-  const p = prompt.toLowerCase();
+  const p = prompt.trim().toLowerCase();
 
-  // URL ingestion or explicit build prompt
+  // 1. Explicit Slash Commands
+  if (p.startsWith("/image") || p.startsWith("/visual") || p.startsWith("/svg")) {
+    return "generate_image";
+  }
+  if (p.startsWith("/draft") || p.startsWith("/write") || p.startsWith("/content")) {
+    return "draft_content";
+  }
+  if (p.startsWith("/brainstorm") || p.startsWith("/angle") || p.startsWith("/hook")) {
+    return "brainstorm";
+  }
+  if (p.startsWith("/audit") || p.startsWith("/check") || p.startsWith("/verify")) {
+    return "audit_content";
+  }
+  if (p.startsWith("/ingest") || p.startsWith("/crawl") || p.startsWith("/scrape")) {
+    return "build_brain";
+  }
+  if (p.startsWith("/plan") || p.startsWith("/calendar") || p.startsWith("/roadmap")) {
+    return "plan_content";
+  }
+  if (p.startsWith("/brain") || p.startsWith("/facts")) {
+    return "manage_brain";
+  }
+
+  // 2. URL ingestion or explicit build prompt
   if (
     /https?:\/\/[^\s]+/.test(prompt) ||
     p.includes("crawl") ||
@@ -82,7 +102,24 @@ export function classifyAgentIntent(prompt: string): AgentIntentType {
     return "build_brain";
   }
 
-  // Content Audit & Claim Checking
+  // 3. Visual / Image Generation
+  if (
+    p.includes("image") ||
+    p.includes("svg") ||
+    p.includes("graphic") ||
+    p.includes("visual") ||
+    p.includes("banner") ||
+    p.includes("illustration") ||
+    p.includes("infographic") ||
+    p.includes("card visual") ||
+    p.includes("make a picture") ||
+    p.includes("generate an image") ||
+    p.includes("thumbnail")
+  ) {
+    return "generate_image";
+  }
+
+  // 4. Content Audit & Claim Checking
   if (
     p.includes("audit") ||
     p.includes("fact check") ||
@@ -95,7 +132,7 @@ export function classifyAgentIntent(prompt: string): AgentIntentType {
     return "audit_content";
   }
 
-  // Brainstorming & Tension Maps
+  // 5. Brainstorming & Tension Maps
   if (
     p.includes("brainstorm") ||
     p.includes("angle") ||
@@ -109,7 +146,7 @@ export function classifyAgentIntent(prompt: string): AgentIntentType {
     return "brainstorm";
   }
 
-  // Content Planning / Calendar
+  // 6. Content Planning / Calendar
   if (
     p.includes("plan") ||
     p.includes("calendar") ||
@@ -121,7 +158,7 @@ export function classifyAgentIntent(prompt: string): AgentIntentType {
     return "plan_content";
   }
 
-  // Manage Brain / Facts List
+  // 7. Manage Brain / Facts List
   if (
     p.includes("show facts") ||
     p.includes("list facts") ||
@@ -135,7 +172,7 @@ export function classifyAgentIntent(prompt: string): AgentIntentType {
     return "manage_brain";
   }
 
-  // Drafting
+  // 8. Drafting
   if (
     p.includes("draft") ||
     p.includes("write") ||
@@ -171,62 +208,94 @@ export async function executeAgentPrompt({
   }
 
   const intent = classifyAgentIntent(prompt);
-  const thinkingSteps: string[] = [];
   const knowledge = db.knowledgeItems.filter((k) => k.clientId === client.id);
   const approvedKnowledge = knowledge.filter((k) => k.status === "approved");
   const approvedMemory = db.memoryCards.filter((m) => m.status === "approved");
 
+  const thinkingSteps: string[] = [];
+  thinkingSteps.push(`Analyzed intent: "${intent.replace(/_/g, " ").toUpperCase()}" for ${client.name}`);
+
   // =========================================================================
-  // 1. BUILD BRAIN (Ingest URL or extract raw text)
+  // 1. GENERATE BRAND SVG IMAGE / VISUAL
+  // =========================================================================
+  if (intent === "generate_image") {
+    thinkingSteps.push(`Activating Brand SVG Visual Studio Skill…`);
+    thinkingSteps.push(`Extracting brand palette (#${client.brandColor.replace('#', '')}) and layout parameters…`);
+
+    const imageOutput = await visualSkill.execute({
+      client,
+      prompt,
+      approvedKnowledge
+    });
+
+    thinkingSteps.push(`Rendered ${imageOutput.aspectLabel} (${imageOutput.dimensions.w}x${imageOutput.dimensions.h}px) with ${imageOutput.styleLabel} layout.`);
+    thinkingSteps.push(`Persisted asset to data/images/${imageOutput.id}.svg.`);
+
+    return {
+      intent: "generate_image",
+      replyMessage: `I crafted a high-contrast **${imageOutput.aspectLabel}** visual (${imageOutput.styleLabel}) for ${client.name} using your brand palette. Inspect, download, or copy the SVG code on the right!`,
+      thinkingSteps,
+      activeArtifactType: "image",
+      payload: {
+        image: imageOutput
+      }
+    };
+  }
+
+  // =========================================================================
+  // 2. INGEST & BUILD BRAIN (URLs or raw text)
   // =========================================================================
   if (intent === "build_brain") {
-    thinkingSteps.push(`Detecting source material for ${client.name}…`);
-    const urlMatch = prompt.match(/https?:\/\/[^\s]+/);
-
+    const urlMatch = prompt.match(/https?:\/\/[^\s]+/i);
     let extracted: ExtractedFact[] = [];
-    let sourceProvenence = "";
+    let sourceLabel = "raw prompt text";
 
     if (urlMatch) {
-      const url = urlMatch[0].replace(/[),.;]+$/, "");
-      thinkingSteps.push(`Crawling target website: ${url}…`);
-      const crawled = await scrapeUrlForKnowledge(url);
-      thinkingSteps.push(`Extracted ${crawled.length} candidate facts from web page.`);
-      extracted = crawled;
-      sourceProvenence = url;
+      const url = urlMatch[0];
+      sourceLabel = url;
+      thinkingSteps.push(`Scraping target URL: ${url}…`);
+      extracted = await scrapeUrlForKnowledge(url);
+      thinkingSteps.push(`Crawled and extracted ${extracted.length} candidate facts.`);
     } else {
-      thinkingSteps.push(`Extracting structured factual claims from prompt notes…`);
-      extracted = await extractFactsFromText(client.name, prompt);
-      thinkingSteps.push(`Extracted ${extracted.length} structured knowledge items.`);
-      sourceProvenence = "Agent Ingestion";
+      thinkingSteps.push(`Extracting factual propositions from prompt text…`);
+      extracted = await extractFactsFromText(prompt);
+      thinkingSteps.push(`Distilled ${extracted.length} factual propositions.`);
+    }
+
+    if (extracted.length === 0) {
+      extracted = [
+        {
+          title: `${client.name} Core Value Proposition`,
+          body: prompt.slice(0, 300),
+          kind: "brand_fact",
+          tags: ["distilled", "agent"]
+        }
+      ];
     }
 
     const t = nowIso();
-    const newItems: KnowledgeItem[] = [];
+    const newItems: KnowledgeItem[] = extracted.map((ef) => ({
+      id: uid("kno"),
+      workspaceId: client.workspaceId,
+      clientId: client.id,
+      kind: ef.kind,
+      title: ef.title,
+      body: ef.body,
+      tags: ef.tags.length > 0 ? ef.tags : ["ingested"],
+      provenance: sourceLabel,
+      sourceUrl: urlMatch ? urlMatch[0] : null,
+      status: "candidate",
+      approvedAt: null,
+      createdAt: t,
+      updatedAt: t
+    }));
 
-    for (const f of extracted) {
-      const item: KnowledgeItem = {
-        id: uid("kn"),
-        workspaceId: client.workspaceId,
-        clientId: client.id,
-        kind: f.kind,
-        title: f.title,
-        body: f.body,
-        sourceUrl: urlMatch ? urlMatch[0] : null,
-        status: "candidate",
-        provenance: sourceProvenence,
-        tags: f.tags || ["ai-ingested"],
-        approvedAt: null,
-        createdAt: t,
-        updatedAt: t
-      };
-      db.knowledgeItems.push(item);
-      newItems.push(item);
-      await audit(db, "knowledge.candidate_added", "knowledge_item", item.id);
-    }
-
+    db.knowledgeItems.unshift(...newItems);
+    await audit(db, "knowledge.bulk_created", "knowledge_item", newItems[0]?.id || "");
     await saveDB(db);
 
     const allClientKnowledge = db.knowledgeItems.filter((k) => k.clientId === client.id);
+    thinkingSteps.push(`Added ${newItems.length} candidate facts to ${client.name}'s knowledge brain.`);
 
     return {
       intent: "build_brain",
@@ -240,90 +309,20 @@ export async function executeAgentPrompt({
   }
 
   // =========================================================================
-  // 2. BRAINSTORM ANGLES & TENSION MAP
+  // 3. BRAINSTORM ANGLES & TENSION MAP
   // =========================================================================
   if (intent === "brainstorm") {
-    thinkingSteps.push(`Reviewing ${approvedKnowledge.length} approved facts for ${client.name}…`);
-    thinkingSteps.push(`Analyzing audience tension points for: ${client.audience || "B2B buyers"}…`);
+    thinkingSteps.push(`Activating Contrarian Angle Discovery Skill…`);
+    thinkingSteps.push(`Applying Token Shield: compressing approved knowledge facts…`);
 
-    const factSnippets = approvedKnowledge.slice(0, 8).map((k) => `• [${k.id}] ${k.title}: ${k.body}`).join("\n");
-    let angles: BrainstormAngle[] = [];
+    const brainstormResult = await brainstormSkill.execute({
+      client,
+      prompt,
+      approvedKnowledge
+    });
 
-    if (openRouterConfigured() && approvedKnowledge.length > 0) {
-      thinkingSteps.push(`Synthesizing contrarian editorial perspectives with OpenRouter…`);
-      const systemPrompt = `You are an elite B2B positioning architect and editorial strategist for ${client.name}.
-Target Audience: ${client.audience || "B2B Decision Makers"}
-Brand Tone: ${client.tone || "Authoritative, practical, direct"}
-Restricted Claims: ${client.restrictedClaims || "None"}
-
-Approved Client Truths:
-${factSnippets}
-
-Generate 4 high-CTR, thought-provoking editorial angles that challenge common industry assumptions using the approved facts.
-Return strictly valid JSON array of objects with keys:
-- title: string
-- hook: string (punchy 1-sentence hook)
-- commonTake: string (the tired industry myth)
-- contrarianAngle: string (the reality supported by our facts)
-- evidencePoints: array of strings
-- recommendedFormat: "linkedin_post" | "x_thread" | "reel_script" | "seo_article"`;
-
-      try {
-        const response = await chatText({
-          system: systemPrompt,
-          user: `Brainstorm 4 high-signal angles for: "${prompt}"`,
-          tier: "cheap"
-        });
-        const parsed = extractJson<BrainstormAngle[]>(response.text);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          angles = parsed.map((a, i) => ({
-            id: `angle_${i + 1}`,
-            title: a.title || `Editorial Angle #${i + 1}`,
-            hook: a.hook || "Most teams get this wrong.",
-            commonTake: a.commonTake || "Conventional wisdom assumes standard playbook rules.",
-            contrarianAngle: a.contrarianAngle || "Data shows verified outcomes outperform generic advice.",
-            evidencePoints: a.evidencePoints || [client.name + " approved facts"],
-            recommendedFormat: a.recommendedFormat || "linkedin_post"
-          }));
-        }
-      } catch {
-        // Fallback below
-      }
-    }
-
-    if (angles.length === 0) {
-      // Deterministic fallback angles
-      angles = [
-        {
-          id: "angle_1",
-          title: "Why Generic AI SDRs Spike Churn",
-          hook: "90% of automated outbound fails because it invents claims buyers can smell from miles away.",
-          commonTake: "More automated volume leads to higher conversion pipeline.",
-          contrarianAngle: "Factual claim verification beats automated spam every single time.",
-          evidencePoints: approvedKnowledge.slice(0, 2).map((k) => k.title),
-          recommendedFormat: "linkedin_post"
-        },
-        {
-          id: "angle_2",
-          title: "The Architecture Tradeoff Nobody Discusses",
-          hook: "Stop building microservices when your data model hasn't even stabilized.",
-          commonTake: "Scalability must be engineered into day one architectures.",
-          contrarianAngle: "Monolithic simplicity with verifiable facts reduces technical debt by 60%.",
-          evidencePoints: approvedKnowledge.slice(0, 2).map((k) => k.title),
-          recommendedFormat: "x_thread"
-        },
-        {
-          id: "angle_3",
-          title: "The High Cost of Hallucinated Marketing Claims",
-          hook: "One unverified metric in your deck can kill enterprise procurement.",
-          commonTake: "Bold marketing claims accelerate buyer excitement.",
-          contrarianAngle: "Legal and IT security teams block vendors with unevidenced ROI promises.",
-          evidencePoints: approvedKnowledge.slice(0, 2).map((k) => k.title),
-          recommendedFormat: "reel_script"
-        }
-      ];
-    }
-
+    const { angles, tokenSavings } = brainstormResult;
+    thinkingSteps.push(`Pruned context: ${tokenSavings.compressedFactCount}/${tokenSavings.baselineFactCount} facts used (~${Math.round(tokenSavings.savingsRatio * 100)}% tokens saved).`);
     thinkingSteps.push(`Synthesized ${angles.length} angle blueprints.`);
 
     return {
@@ -331,6 +330,7 @@ Return strictly valid JSON array of objects with keys:
       replyMessage: `I analyzed ${client.name}'s approved facts and synthesized **${angles.length} contrarian angles** in the Angle Matrix Artifact on the right. Click *"Draft from this angle"* on any card to immediately author it.`,
       thinkingSteps,
       activeArtifactType: "brainstorm",
+      tokenSavings,
       payload: {
         angles
       }
@@ -338,131 +338,49 @@ Return strictly valid JSON array of objects with keys:
   }
 
   // =========================================================================
-  // 3. AUDIT CONTENT & CLAIM LEDGER CHECK
+  // 4. AUDIT CONTENT & CLAIM LEDGER CHECK
   // =========================================================================
   if (intent === "audit_content") {
-    thinkingSteps.push(`Auditing input copy against ${client.name}'s approved brain…`);
-    thinkingSteps.push(`Checking restricted claim boundaries: "${client.restrictedClaims || "No restrictions"}"…`);
+    thinkingSteps.push(`Activating Anti-Hallucination Claim Audit Skill…`);
+    thinkingSteps.push(`Auditing input copy against ${client.name}'s approved facts and restricted claims…`);
 
-    const sentences = prompt
-      .replace(/^(audit|check|verify|analyze|critique)\s*(this)?\s*:?/i, "")
-      .split(/(?<=[.?!])\s+/)
-      .filter((s) => s.trim().length > 10);
+    const auditResult = await auditSkill.execute({
+      client,
+      prompt,
+      approvedKnowledge
+    });
 
-    const claims: ContentAuditReport["claims"] = [];
-    const violations: string[] = [];
-
-    const restrictedKeywords = (client.restrictedClaims || "")
-      .toLowerCase()
-      .split(/[,;\n]/)
-      .map((k) => k.trim())
-      .filter((k) => k.length > 3);
-
-    for (const sentence of sentences) {
-      const lower = sentence.toLowerCase();
-      let matchedViolation = "";
-      for (const keyword of restrictedKeywords) {
-        if (lower.includes(keyword)) {
-          matchedViolation = keyword;
-          break;
-        }
-      }
-
-      if (matchedViolation) {
-        violations.push(`Sentence contains restricted phrase: "${matchedViolation}"`);
-        claims.push({
-          text: sentence,
-          kind: "unsupported",
-          citations: [],
-          riskNote: `Violates client restriction: "${matchedViolation}".`
-        });
-        continue;
-      }
-
-      // Check if matched against any approved knowledge item
-      const matchedFact = approvedKnowledge.find((k) =>
-        lower.includes(k.title.toLowerCase()) ||
-        k.body.toLowerCase().split(" ").filter((w) => w.length > 5 && lower.includes(w)).length >= 3
-      );
-
-      if (matchedFact) {
-        claims.push({
-          text: sentence,
-          kind: "factual",
-          citations: [matchedFact.title]
-        });
-      } else if (
-        lower.includes("think") ||
-        lower.includes("believe") ||
-        lower.includes("in our experience") ||
-        lower.includes("we recommend") ||
-        lower.includes("should")
-      ) {
-        claims.push({
-          text: sentence,
-          kind: "opinion",
-          citations: ["Founder Opinion"],
-          riskNote: "Marked as opinion. Requires founder sign-off before publishing."
-        });
-      } else {
-        claims.push({
-          text: sentence,
-          kind: "unsupported",
-          citations: [],
-          riskNote: "No direct citation in approved knowledge brain."
-        });
-      }
-    }
-
-    const verified = claims.filter((c) => c.kind === "factual").length;
-    const opinions = claims.filter((c) => c.kind === "opinion").length;
-    const unsupported = claims.filter((c) => c.kind === "unsupported").length;
-    const total = claims.length || 1;
-    const score = Math.max(0, Math.min(100, Math.round(((verified * 1.0 + opinions * 0.7) / total) * 100)));
-
-    const auditReport: ContentAuditReport = {
-      score,
-      summary:
-        score >= 80
-          ? "High Grounding Integrity: Copy closely adheres to verified facts."
-          : score >= 50
-          ? "Moderate Risk: Several statements lack evidence citations."
-          : "High Hallucination Risk: Multiple claims lack proof in approved brain.",
-      verifiedCount: verified,
-      opinionCount: opinions,
-      unsupportedCount: unsupported,
-      violations,
-      claims
-    };
-
-    thinkingSteps.push(`Audit score computed: ${score}% (${verified} verified, ${unsupported} unsupported).`);
+    const { report, tokenSavings } = auditResult;
+    thinkingSteps.push(`Audit score computed: ${report.score}% (${report.verifiedCount} verified, ${report.unsupportedCount} unsupported).`);
 
     return {
       intent: "audit_content",
-      replyMessage: `I completed a Claim Ledger Audit of your copy. **Grounding Score: ${score}%**. ${unsupported > 0 ? `⚠️ Found ${unsupported} unsupported assertions that require citations.` : `✓ All claims verified.`} Inspect the full audit breakdown on the right.`,
+      replyMessage: `I completed a Claim Ledger Audit of your copy. **Grounding Score: ${report.score}%**. ${
+        report.unsupportedCount > 0 ? `⚠️ Found ${report.unsupportedCount} unsupported assertions that require citations.` : `✓ All claims verified.`
+      } Inspect the full audit breakdown on the right.`,
       thinkingSteps,
       activeArtifactType: "audit",
+      tokenSavings,
       payload: {
-        auditReport
+        auditReport: report
       }
     };
   }
 
   // =========================================================================
-  // 4. PLAN PUBLISHING CALENDAR
+  // 5. PLAN PUBLISHING CALENDAR
   // =========================================================================
   if (intent === "plan_content") {
-    thinkingSteps.push(`Reading approved facts and writing guidelines for ${client.name}…`);
+    thinkingSteps.push(`Activating Editorial Strategy Planner Skill…`);
     thinkingSteps.push(`Generating multi-channel publishing roadmap…`);
 
-    const month = new Date().toISOString().slice(0, 7);
-    const planItems = await generateCalendarPlan({
+    const planResult = await planSkill.execute({
       client,
-      knowledge: approvedKnowledge,
-      memory: approvedMemory,
-      month
+      prompt,
+      approvedKnowledge
     });
 
+    const { planItems, tokenSavings } = planResult;
     thinkingSteps.push(`Scheduled ${planItems.length} content dispatches.`);
 
     return {
@@ -470,38 +388,40 @@ Return strictly valid JSON array of objects with keys:
       replyMessage: `I drafted a strategic **${planItems.length}-dispatch content roadmap** for ${client.name} across LinkedIn, X, and SEO blogs. You can view, tweak dates, or approve them in the Plan Canvas on the right.`,
       thinkingSteps,
       activeArtifactType: "plan",
+      tokenSavings,
       payload: {
-        planItems: planItems.map((p, i) => ({
-          id: `plan_${i + 1}`,
-          title: p.title,
-          channel: p.channel,
-          publishDate: p.publishDate,
-          notes: p.notes
-        }))
+        planItems
       }
     };
   }
 
   // =========================================================================
-  // 5. DRAFT CONTENT (Default or explicit drafting)
+  // 6. DRAFT CONTENT (Default or explicit drafting)
   // =========================================================================
   if (intent === "draft_content" || intent === "chat") {
-    thinkingSteps.push(`Selecting optimal content format and channel for ${client.name}…`);
+    thinkingSteps.push(`Activating Editorial Content Generator Skill…`);
 
     let format: AssetFormat = explicitFormat || "linkedin_post";
-    if (prompt.toLowerCase().includes("thread") || prompt.toLowerCase().includes("twitter") || prompt.toLowerCase().includes("x post")) {
+    const p = prompt.toLowerCase();
+    if (p.includes("thread") || p.includes("twitter") || p.includes("x post")) {
       format = "x_thread";
-    } else if (prompt.toLowerCase().includes("reel") || prompt.toLowerCase().includes("video") || prompt.toLowerCase().includes("script")) {
+    } else if (p.includes("reel") || p.includes("video") || p.includes("script")) {
       format = "reel_script";
-    } else if (prompt.toLowerCase().includes("article") || prompt.toLowerCase().includes("blog") || prompt.toLowerCase().includes("seo")) {
+    } else if (p.includes("article") || p.includes("blog") || p.includes("seo")) {
       format = "seo_article";
+    } else if (p.includes("newsletter") || p.includes("email")) {
+      format = "newsletter";
+    } else if (p.includes("faq")) {
+      format = "faq";
     }
 
-    thinkingSteps.push(`Grounding copy in ${approvedKnowledge.length} approved facts…`);
+    thinkingSteps.push(`Applying Token Shield: compressing approved knowledge facts…`);
+    const compressed = compressKnowledgeContext(prompt, approvedKnowledge.length > 0 ? approvedKnowledge : knowledge, 6);
+    thinkingSteps.push(`Pruned context: ${compressed.compressedFactCount}/${compressed.baselineFactCount} facts used (~${Math.round(compressed.savingsRatio * 100)}% tokens saved).`);
 
     const { draft, model } = await generateStudioAsset({
       client,
-      knowledge: approvedKnowledge.length > 0 ? approvedKnowledge : knowledge,
+      knowledge: compressed.facts,
       memory: approvedMemory,
       format,
       brief: prompt
@@ -529,7 +449,7 @@ Return strictly valid JSON array of objects with keys:
       platform: formatChannel(format),
       format,
       title: draft.title,
-      knowledgeIds: approvedKnowledge.map((k) => k.id),
+      knowledgeIds: compressed.facts.map((k) => k.id),
       status: "in_review",
       currentVersion: 1,
       createdAt: t,
@@ -543,7 +463,7 @@ Return strictly valid JSON array of objects with keys:
       version: 1,
       body: draft.body,
       model,
-      sourceIds: approvedKnowledge.map((k) => k.id),
+      sourceIds: compressed.facts.map((k) => k.id),
       promptTemplate: draft.promptTemplate,
       estCostUsd: 0,
       createdAt: t
@@ -562,6 +482,14 @@ Return strictly valid JSON array of objects with keys:
       replyMessage: `I drafted a **${STUDIO_FORMATS.find((f) => f.id === format)?.label || format}** for ${client.name} grounded in your approved knowledge. Check the live draft and traceable Claim Ledger on the right.`,
       thinkingSteps,
       activeArtifactType: "draft",
+      tokenSavings: {
+        baselineFactCount: compressed.baselineFactCount,
+        compressedFactCount: compressed.compressedFactCount,
+        baselineEstimatedTokens: compressed.baselineEstimatedTokens,
+        compressedEstimatedTokens: compressed.compressedEstimatedTokens,
+        tokensSaved: compressed.tokensSaved,
+        savingsRatio: compressed.savingsRatio
+      },
       payload: {
         asset: newAsset,
         version: newVersion,

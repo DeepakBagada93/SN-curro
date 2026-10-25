@@ -245,4 +245,33 @@ Eliminate synthetic mock/demo seeds, connect the live OpenRouter AI inference pi
   - Verified full test suite (`npm test`): 37/37 tests passing in 429ms.
   - Verified production build (`next build`): 38/38 routes statically and dynamically optimized.
 
+---
+
+## Phase 14: Centralized AI Skills Framework & Advanced Prompt-Driven OS
+- [x] **14.1 Centralized Skills Engine & Token Compressor (`lib/skills/`)**
+  - `lib/skills/core-skills.ts`: Central Skill Registry, base types, anti-AI fluff rules, EEAT citation guidelines, schema validation.
+  - `lib/skills/token-compressor.ts`: Intelligent context pruning & keyword-relevance compressor. Cuts prompt context from 2,500+ tokens to ~300 tokens (65-75% token savings).
+- [x] **14.2 Specialized Production AI Skills**
+  - `lib/skills/content-skill.ts`: Upgraded high-CTR, human-written content generation (LinkedIn, X Thread, Video/Reel Script, SEO Article, Newsletter, FAQ) with claim ledger grounding.
+  - `lib/skills/visual-skill.ts`: Prompt-to-SVG generation, dynamic aspect ratios (`1:1`, `16:9`, `9:16`, `4:5`), brand color extraction, file writing to `data/images/`, and metadata registration.
+  - `lib/skills/brainstorm-skill.ts`: High-resonance audience tension mapping, 4 contrarian angles, viral hooks.
+  - `lib/skills/audit-skill.ts`: Sentence-level claim verification, confidence scoring, hallucination boundary check.
+  - `lib/skills/ingest-skill.ts`: Web crawling & text fact distillation into structured knowledge items.
+  - `lib/skills/plan-skill.ts`: Editorial cadence & 7/30-day publishing roadmap synthesis.
+- [x] **14.3 Agent Engine Upgrade with Slash Commands & Multimodal Visual Generation (`lib/agent-engine.ts`)**
+  - Add `GENERATE_IMAGE` intent classification and slash commands: `/draft`, `/image`, `/brainstorm`, `/audit`, `/ingest`, `/plan`.
+  - Natural language prompt triggers for visual assets ("create an image for...", "generate a graphic showing...", "make an infographic/diagram").
+  - Connect all skills to `executeAgentPrompt` with `tokenSavings` reporting (baseline tokens, sent tokens, % saved).
+- [x] **14.4 Dynamic Artifact Canvas - Interactive Image Canvas (`components/dynamic-artifact-canvas.tsx`)**
+  - New `ImageCanvas` interactive view: live SVG rendering, aspect ratio selector, hex palette badges, 1-click Download SVG, Copy SVG code, and "Attach to Draft" bridge.
+- [x] **14.5 Claude-Style Chat UI Upgrade with Slash Autocomplete & Token Shield HUD (`components/agent-chat-pane.tsx` & `components/prompt-agent-workspace.tsx`)**
+  - Slash command menu / autocomplete popup when user types `/`.
+  - Live Token Shield HUD badge (`⚡ Token Shield: ~72% saved`) showing saved tokens.
+  - Seamless switching across all 6 artifact modes (`draft`, `image`, `brainstorm`, `audit`, `brain`, `plan`).
+- [x] **14.6 Automated Verification, Unit Tests & Production Build**
+  - Added comprehensive unit tests for skills framework, token compressor, and image intent in `tests/skills.test.ts`.
+  - Verified `npx tsc --noEmit` (0 errors), `npm test` (50/50 passing in 405ms), and `npm run build` (38/38 routes optimized).
+
+
+
 

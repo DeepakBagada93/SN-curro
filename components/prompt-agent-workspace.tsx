@@ -5,6 +5,7 @@ import { AgentChatPane } from "./agent-chat-pane";
 import { DynamicArtifactCanvas } from "./dynamic-artifact-canvas";
 import type { AgentExecutionResult, BrainstormAngle } from "@/lib/agent-engine";
 import type { Client, KnowledgeItem, ContentAsset, ContentVersion, ClaimEntry } from "@/lib/types";
+import type { VisualSkillOutput } from "@/lib/skills";
 
 export function PromptAgentWorkspace({
   client,
@@ -19,7 +20,7 @@ export function PromptAgentWorkspace({
 }) {
   const [activeClient, setActiveClient] = useState(client);
   const [activeArtifactType, setActiveArtifactType] = useState<
-    "brain" | "brainstorm" | "audit" | "draft" | "plan"
+    "brain" | "brainstorm" | "audit" | "draft" | "plan" | "image"
   >("brain");
 
   const [brainFacts, setBrainFacts] = useState<KnowledgeItem[]>(initialKnowledge);
@@ -49,6 +50,7 @@ export function PromptAgentWorkspace({
   const [currentVersion, setCurrentVersion] = useState<ContentVersion | undefined>();
   const [currentClaims, setCurrentClaims] = useState<ClaimEntry[]>([]);
   const [planItems, setPlanItems] = useState<AgentExecutionResult["payload"]["planItems"]>([]);
+  const [currentImage, setCurrentImage] = useState<VisualSkillOutput | undefined>();
 
   const handleExecutionResult = (res: AgentExecutionResult) => {
     setActiveArtifactType(res.activeArtifactType);
@@ -73,6 +75,9 @@ export function PromptAgentWorkspace({
     }
     if (res.payload.planItems) {
       setPlanItems(res.payload.planItems);
+    }
+    if (res.payload.image) {
+      setCurrentImage(res.payload.image);
     }
   };
 
@@ -117,10 +122,10 @@ export function PromptAgentWorkspace({
         </div>
 
         {/* Quick Mode Switcher */}
-        <div className="flex items-center gap-1 bg-[#F4F3ED] p-1 rounded-xl text-xs border border-border/60">
+        <div className="flex items-center gap-1 bg-[#F4F3ED] p-1 rounded-xl text-xs border border-border/60 overflow-x-auto">
           <button
             onClick={() => setActiveArtifactType("brain")}
-            className={`px-3 py-1 rounded-lg font-medium transition-colors ${
+            className={`px-3 py-1 rounded-lg font-medium transition-colors whitespace-nowrap ${
               activeArtifactType === "brain"
                 ? "bg-white font-semibold text-foreground shadow-xs"
                 : "text-muted-foreground hover:text-foreground"
@@ -130,43 +135,53 @@ export function PromptAgentWorkspace({
           </button>
           <button
             onClick={() => setActiveArtifactType("brainstorm")}
-            className={`px-3 py-1 rounded-lg font-medium transition-colors ${
+            className={`px-3 py-1 rounded-lg font-medium transition-colors whitespace-nowrap ${
               activeArtifactType === "brainstorm"
                 ? "bg-white font-semibold text-foreground shadow-xs"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            💡 Brainstorm ({angles.length})
+            💡 Angles ({angles.length})
+          </button>
+          <button
+            onClick={() => setActiveArtifactType("image")}
+            className={`px-3 py-1 rounded-lg font-medium transition-colors whitespace-nowrap ${
+              activeArtifactType === "image"
+                ? "bg-white font-semibold text-foreground shadow-xs"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            🎨 Visual Studio
           </button>
           <button
             onClick={() => setActiveArtifactType("audit")}
-            className={`px-3 py-1 rounded-lg font-medium transition-colors ${
+            className={`px-3 py-1 rounded-lg font-medium transition-colors whitespace-nowrap ${
               activeArtifactType === "audit"
                 ? "bg-white font-semibold text-foreground shadow-xs"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            🔍 Audit Ledger
+            🛡️ Claim Audit
           </button>
           <button
             onClick={() => setActiveArtifactType("draft")}
-            className={`px-3 py-1 rounded-lg font-medium transition-colors ${
+            className={`px-3 py-1 rounded-lg font-medium transition-colors whitespace-nowrap ${
               activeArtifactType === "draft"
                 ? "bg-white font-semibold text-foreground shadow-xs"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            📄 Draft & Studio
+            ✍️ Content Draft
           </button>
           <button
             onClick={() => setActiveArtifactType("plan")}
-            className={`px-3 py-1 rounded-lg font-medium transition-colors ${
+            className={`px-3 py-1 rounded-lg font-medium transition-colors whitespace-nowrap ${
               activeArtifactType === "plan"
                 ? "bg-white font-semibold text-foreground shadow-xs"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            📅 Plan Roadmap
+            📅 Calendar Plan
           </button>
         </div>
       </div>
@@ -206,6 +221,7 @@ export function PromptAgentWorkspace({
           version={currentVersion}
           claims={currentClaims}
           planItems={planItems}
+          image={currentImage}
           onSelectAngle={handleSelectAngle}
           onApproveFact={handleApproveFact}
           onDeleteFact={handleDeleteFact}

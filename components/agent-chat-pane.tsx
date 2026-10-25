@@ -11,14 +11,32 @@ export interface ChatMessage {
   time: string;
   thinkingSteps?: string[];
   intent?: string;
+  tokenSavings?: {
+    baselineFactCount: number;
+    compressedFactCount: number;
+    baselineEstimatedTokens: number;
+    compressedEstimatedTokens: number;
+    tokensSaved: number;
+    savingsRatio: number;
+  };
 }
 
 const STARTER_CHIPS = [
   { label: "🧠 Ingest URL / Build Brain", prompt: "Crawl https://saasnext.in and build our knowledge brain with approved facts" },
+  { label: "🎨 Generate Brand Visual", prompt: "/image 1:1 square stat callout showing 10x verified ROI for modern teams" },
   { label: "💡 Brainstorm Contrarian Angles", prompt: "Brainstorm 4 contrarian angles on industry myths using our approved facts" },
   { label: "🔍 Audit Draft & Claims", prompt: "Audit this draft: Most enterprise AI SDRs fail because they hallucinate metrics without verifiable proof" },
   { label: "✍️ Draft LinkedIn Post", prompt: "Draft a high-signal LinkedIn post on why simple architectures beat microservices" },
   { label: "📅 Plan 7-Day Content Roadmap", prompt: "Plan next week's 7-day content schedule across LinkedIn, X, and SEO blogs" }
+];
+
+const SLASH_COMMANDS = [
+  { cmd: "/draft", label: "✍️ /draft", desc: "Write verified content (LinkedIn, X, Reel, SEO)", snippet: "/draft " },
+  { cmd: "/image", label: "🎨 /image", desc: "Generate brand SVG graphic or metric callout", snippet: "/image " },
+  { cmd: "/brainstorm", label: "💡 /brainstorm", desc: "Discover contrarian angles & viral hooks", snippet: "/brainstorm " },
+  { cmd: "/audit", label: "🛡️ /audit", desc: "Verify claims and check hallucination risks", snippet: "/audit " },
+  { cmd: "/ingest", label: "🧠 /ingest", desc: "Crawl URL or distill document into facts", snippet: "/ingest " },
+  { cmd: "/plan", label: "📅 /plan", desc: "Generate 7-day or 30-day content calendar", snippet: "/plan " }
 ];
 
 export function AgentChatPane({
@@ -36,7 +54,7 @@ export function AgentChatPane({
     {
       id: "msg_welcome",
       role: "assistant",
-      text: `Hello! I am Curro, your agency thought partner for **${client.name}**. I can crawl URLs to build knowledge, brainstorm contrarian angles, audit drafts against claim ledgers, or plan strategic publishing schedules.\n\nWhat shall we work on today?`,
+      text: `Hello! I am Curro, your agency thought partner for **${client.name}**.\n\nI can author verified content drafts, generate brand SVG graphics, discover contrarian angles, audit claims for hallucination, or build knowledge from client URLs.\n\nType **/** to view specialized skills or ask anything below!`,
       time: "Just now",
       thinkingSteps: [`Connected to ${client.name}'s Knowledge Brain (${client.factsCount} facts)`]
     }
@@ -45,8 +63,10 @@ export function AgentChatPane({
   const [selectedFormat, setSelectedFormat] = useState<AssetFormat>("linkedin_post");
   const [isThinking, setIsThinking] = useState(false);
   const [expandedThinking, setExpandedThinking] = useState<Record<string, boolean>>({});
+  const [showSlashMenu, setShowSlashMenu] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -56,10 +76,27 @@ export function AgentChatPane({
     setExpandedThinking((prev) => ({ ...prev, [msgId]: !prev[msgId] }));
   };
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    setInputPrompt(val);
+    if (val.startsWith("/") && !val.includes(" ")) {
+      setShowSlashMenu(true);
+    } else {
+      setShowSlashMenu(false);
+    }
+  };
+
+  const handleSelectSlashCommand = (snippet: string) => {
+    setInputPrompt(snippet);
+    setShowSlashMenu(false);
+    inputRef.current?.focus();
+  };
+
   const handleSendPrompt = async (overridePrompt?: string) => {
     const textToSend = (overridePrompt || inputPrompt).trim();
     if (!textToSend || isThinking) return;
 
+    setShowSlashMenu(false);
     const userMsgId = `user_${Date.now()}`;
     const userMsg: ChatMessage = {
       id: userMsgId,
@@ -97,7 +134,8 @@ export function AgentChatPane({
         text: res.replyMessage,
         time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         thinkingSteps: res.thinkingSteps,
-        intent: res.intent
+        intent: res.intent,
+        tokenSavings: res.tokenSavings
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
@@ -123,6 +161,8 @@ export function AgentChatPane({
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSendPrompt();
+    } else if (e.key === "Escape") {
+      setShowSlashMenu(false);
     }
   };
 
@@ -146,7 +186,7 @@ export function AgentChatPane({
         {/* Model Tag */}
         <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-mono">
           <span className="w-1.5 h-1.5 rounded-full bg-success inline-block animate-pulse" />
-          <span>OpenRouter Nemotron</span>
+          <span>Skills Engine · OpenRouter</span>
         </div>
       </div>
 
@@ -191,6 +231,18 @@ export function AgentChatPane({
               <div className="whitespace-pre-wrap leading-relaxed text-xs sm:text-sm font-sans">
                 {msg.text}
               </div>
+
+              {/* Token Shield HUD */}
+              {msg.tokenSavings && msg.tokenSavings.tokensSaved > 0 && (
+                <div className="mt-2.5 pt-2 border-t border-border/40 flex items-center gap-1.5 text-[11px] font-mono text-success">
+                  <span className="bg-success/15 px-1.5 py-0.5 rounded font-semibold">
+                    ⚡ Token Shield: ~{Math.round(msg.tokenSavings.savingsRatio * 100)}% saved
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">
+                    ({msg.tokenSavings.tokensSaved} tokens pruned)
+                  </span>
+                </div>
+              )}
             </div>
             <span className="text-[10px] text-muted-foreground mt-1 px-1">{msg.time}</span>
           </div>
@@ -200,7 +252,7 @@ export function AgentChatPane({
         {isThinking && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground p-3 rounded-xl bg-card border border-border/60">
             <span className="inline-block animate-spin text-accent">⚙️</span>
-            <span className="font-mono text-[11px]">Curro Agent is thinking & executing pipeline…</span>
+            <span className="font-mono text-[11px]">Curro Agent is executing skills pipeline…</span>
           </div>
         )}
 
@@ -223,15 +275,36 @@ export function AgentChatPane({
         </div>
       </div>
 
-      {/* Input Box Area */}
-      <div className="p-3 border-t border-[#E8E6DF] bg-white space-y-2">
+      {/* Input Box Area with Slash Commands Popup */}
+      <div className="relative p-3 border-t border-[#E8E6DF] bg-white space-y-2">
+        {/* Slash Command Autocomplete Menu */}
+        {showSlashMenu && (
+          <div className="absolute bottom-full left-3 right-3 mb-2 rounded-xl border border-border bg-white shadow-xl p-2 z-20 space-y-1">
+            <div className="px-2 py-1 text-[10px] font-mono text-muted-foreground uppercase tracking-wider">
+              Curro AI Skills Menu (Select or type)
+            </div>
+            {SLASH_COMMANDS.map((item) => (
+              <button
+                key={item.cmd}
+                type="button"
+                onClick={() => handleSelectSlashCommand(item.snippet)}
+                className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left hover:bg-muted transition-colors text-xs"
+              >
+                <span className="font-semibold text-accent font-mono">{item.label}</span>
+                <span className="text-muted-foreground text-[11px]">{item.desc}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="relative">
           <textarea
+            ref={inputRef}
             value={inputPrompt}
-            onChange={(e) => setInputPrompt(e.target.value)}
+            onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             rows={3}
-            placeholder={`Instruct Curro for ${client.name}… (e.g. "Crawl our docs URL", "Brainstorm 3 angles", "Audit draft", "Plan next week")`}
+            placeholder={`Instruct Curro for ${client.name}… Type / for skills (/draft, /image, /brainstorm, /audit, /ingest, /plan)`}
             className="w-full resize-none bg-transparent text-xs sm:text-sm leading-relaxed text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
           />
         </div>
@@ -249,6 +322,13 @@ export function AgentChatPane({
               <option value="reel_script">🎥 Reel Script</option>
               <option value="seo_article">📑 SEO Article</option>
             </select>
+            <button
+              type="button"
+              onClick={() => setShowSlashMenu((prev) => !prev)}
+              className="px-2 py-1 rounded text-[11px] font-mono bg-muted text-muted-foreground hover:text-foreground"
+            >
+              / skills
+            </button>
             <span className="text-[10px] text-muted-foreground hidden sm:inline">
               ↵ Enter to send
             </span>
