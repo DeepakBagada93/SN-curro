@@ -107,7 +107,11 @@ export class ParallelSearchAdapter implements ResearchProvider {
       try {
         const res = await fetch("https://api.parallel.ai/v1/search", {
           method: "POST",
-          headers: { "Content-Type": "application/json", "x-api-key": key },
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": key,
+            Authorization: `Bearer ${key}`
+          },
           body: JSON.stringify({
             objective: `Find recent, citable developments relevant to: ${theme}. Prefer primary sources, research reports, platform documentation and dated reporting. Extract concrete evidence, not opinions.`,
             search_queries: [theme],
