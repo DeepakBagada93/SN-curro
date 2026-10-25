@@ -42,7 +42,33 @@ async function addClient(formData: FormData) {
   redirect(`/clients/${client.id}`);
 }
 
-export default async function ClientsPage({ searchParams }: { searchParams: { error?: string } }) {
+async function deleteClientAction(clientId: string): Promise<{ ok: boolean; error?: string }> {
+  "use server";
+  try {
+    const { loadDB: l, saveDB, audit } = await import("@/lib/store");
+    const { revalidatePath } = await import("next/cache");
+    const db = await l();
+    const index = db.clients.findIndex((c) => c.id === clientId);
+    if (index === -1) return { ok: false, error: "Client not found." };
+
+    db.clients.splice(index, 1);
+    db.knowledgeItems = db.knowledgeItems.filter((k) => k.clientId !== clientId);
+    db.plans = db.plans.filter((p) => p.clientId !== clientId);
+    db.planItems = db.planItems.filter((p) => p.clientId !== clientId);
+    db.assets = db.assets.filter((a) => a.clientId !== clientId);
+    db.posts = db.posts.filter((p) => p.clientId !== clientId);
+
+    await audit(db, "client.deleted", "client", clientId);
+    await saveDB(db);
+    revalidatePath("/clients");
+    return { ok: true };
+  } catch (err: unknown) {
+    const error = err instanceof Error ? err.message : "Failed to delete client.";
+    return { ok: false, error };
+  }
+}
+
+export default async function ClientsPage({ searchParams }: { searchParams: { error?: string; message?: string } }) {
   const db = await loadDB();
   const active = db.clients.filter((c) => c.status === "active");
   const allKnowledge = db.knowledgeItems;
@@ -82,6 +108,10 @@ export default async function ClientsPage({ searchParams }: { searchParams: { er
         <p className="alert alert-danger">Could not create the client — add a name (2+ characters) and a valid brand colour.</p>
       )}
 
+      {searchParams.message === "deleted" && (
+        <p className="alert alert-success">✓ Client account and all associated brain data deleted.</p>
+      )}
+
       {db.clients.length === 0 ? (
         <div className="card">
           <EmptyState
@@ -92,6 +122,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: { er
         </div>
       ) : (
         <ClientList
+          onDeleteClient={deleteClientAction}
           clients={db.clients.map((c): ClientCardData => {
             const items = db.knowledgeItems.filter((k) => k.clientId === c.id);
             const ks = knowledgeStats(items);

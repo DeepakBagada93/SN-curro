@@ -245,6 +245,24 @@ async function deleteKnowledgeAction(
   }
 }
 
+async function deleteClientFromDetailPage(clientId: string) {
+  "use server";
+  const { loadDB: l, saveDB, audit } = await import("@/lib/store");
+  const db = await l();
+  const index = db.clients.findIndex((c) => c.id === clientId);
+  if (index !== -1) {
+    db.clients.splice(index, 1);
+    db.knowledgeItems = db.knowledgeItems.filter((k) => k.clientId !== clientId);
+    db.plans = db.plans.filter((p) => p.clientId !== clientId);
+    db.planItems = db.planItems.filter((p) => p.clientId !== clientId);
+    db.assets = db.assets.filter((a) => a.clientId !== clientId);
+    db.posts = db.posts.filter((p) => p.clientId !== clientId);
+    await audit(db, "client.deleted", "client", clientId);
+    await saveDB(db);
+  }
+  redirect("/clients?message=deleted");
+}
+
 async function updateClient(clientId: string, formData: FormData) {
   "use server";
   const { loadDB: l, saveDB, audit, nowIso } = await import("@/lib/store");
@@ -697,6 +715,18 @@ export default async function ClientDetailPage({
             <p className="mt-2 text-muted-foreground">{client.contactName || "No contact yet"}</p>
             <p className="font-mono text-xs text-muted-foreground">{client.contactEmail || "—"}</p>
             <p className="mt-2 text-[11px] text-muted-foreground">Approval portal (magic link) is planned after the internal workflow is reliable.</p>
+          </div>
+
+          <div className="card border-destructive/30 bg-destructive/5 text-sm">
+            <h3 className="font-display text-base font-semibold text-destructive">Danger zone</h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Permanently delete this client account and all associated Knowledge Brain facts, monthly plans, and drafts.
+            </p>
+            <form action={deleteClientFromDetailPage.bind(null, client.id)} className="mt-3">
+              <SubmitButton pendingText="Deleting client account…" className="btn btn-danger btn-sm">
+                Delete client account
+              </SubmitButton>
+            </form>
           </div>
         </aside>
       </section>
