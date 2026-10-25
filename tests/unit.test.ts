@@ -6,6 +6,7 @@ import { canAssetTransition, claimBlockers, canApproveAsset, PLAN_CATALOG } from
 import { buildCalendarDrafts } from "../lib/planner";
 import { createReviewToken, verifyReviewToken } from "../lib/review";
 import { generateStudioDraft } from "../lib/studio";
+import { scrapeUrlForKnowledge } from "../lib/crawler";
 
 describe("canonicalUrl", () => {
   it("strips tracking params and www", () => {
@@ -182,5 +183,10 @@ describe("studio formats", () => {
     expect(draft.body).toContain("CTA (35–45s)");
     expect(draft.claims.some((c) => c.kind === "factual" && c.sourceIds.includes("k1"))).toBe(true);
     expect(draft.claims.some((c) => c.kind === "unsupported")).toBe(true);
+  });
+
+  it("validates crawler url input", async () => {
+    await expect(scrapeUrlForKnowledge("invalid-url")).rejects.toThrow("Invalid URL");
+    await expect(scrapeUrlForKnowledge("ftp://example.com")).rejects.toThrow("Invalid URL");
   });
 });

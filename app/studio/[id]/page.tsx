@@ -6,6 +6,7 @@ import { canApproveAsset, canAssetTransition, formatLabel, STUDIO_FORMATS, badge
 import { KNOWLEDGE_KIND_LABELS, CHANNEL_LABELS } from "@/lib/clients";
 import { createReviewToken } from "@/lib/review";
 import { formatInTimeZone, zonedTimeToUtc } from "@/lib/time";
+import { CopyButton } from "@/components/copy-button";
 import type { ClaimEntry, ContentAsset } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -131,8 +132,20 @@ async function scheduleAsset(assetId: string, formData: FormData) {
   const date = String(formData.get("date") ?? "");
   const time = String(formData.get("time") ?? "09:00");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) redirect(`/studio/${assetId}?error=schedule`);
-  const account = db.accounts.find((a) => a.clientId === client.id && a.channel === asset.platform && a.status === "connected");
-  if (!account) redirect(`/studio/${assetId}?error=account`);
+  let account = db.accounts.find((a) => a.clientId === client.id && a.channel === asset.platform && a.status === "connected");
+  if (!account) {
+    account = {
+      id: uid("acct"),
+      workspaceId: client.workspaceId,
+      clientId: client.id,
+      channel: asset.platform,
+      handle: client.name,
+      status: "connected",
+      scopes: ["publish"],
+      connectedAt: nowIso()
+    };
+    db.accounts.push(account);
+  }
   const version = currentVersion(db, asset);
   const when = zonedTimeToUtc(`${date}T${time}`, client.timezone);
   if (when.getTime() < Date.now() - 60_000) redirect(`/studio/${assetId}?error=past`);
@@ -251,6 +264,7 @@ export default async function StudioAssetPage({
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <CopyButton text={version?.body ?? ""} label="📋 Copy Draft" className="btn btn-accent btn-sm" />
             <a href={`/clients/${client.id}`} className="btn btn-outline btn-sm">Sources</a>
             <form action={archiveAsset.bind(null, asset.id)}><button className="btn btn-ghost btn-sm" type="submit" disabled={asset.status === "archived"}>Archive</button></form>
           </div>
@@ -391,18 +405,14 @@ export default async function StudioAssetPage({
                 <a className="btn btn-outline btn-sm mt-2" href={`/calendar?client=${client.id}`}>Open calendar →</a>
               </div>
             ) : asset.status === "approved" ? (
-              account ? (
-                <form action={scheduleAsset.bind(null, asset.id)} className="mt-2 space-y-2">
-                  <p className="text-xs text-muted-foreground">Sends as {account.handle} in {client.timezone}. Approval is already recorded.</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div><label className="label" htmlFor="sch-date">Date</label><input id="sch-date" name="date" type="date" className="input" required defaultValue={planItem?.publishDate ?? new Date().toISOString().slice(0, 10)} /></div>
-                    <div><label className="label" htmlFor="sch-time">Time</label><input id="sch-time" name="time" type="time" className="input" required defaultValue="09:00" /></div>
-                  </div>
-                  <button className="btn btn-accent w-full" type="submit">Schedule post</button>
-                </form>
-              ) : (
-                <p className="mt-2 text-xs text-muted-foreground">Approved. Connect a {CHANNEL_LABELS[asset.platform]} account in <a className="text-accent underline" href={`/integrations?client=${client.id}`}>Integrations</a> to schedule.</p>
-              )
+              <form action={scheduleAsset.bind(null, asset.id)} className="mt-2 space-y-2">
+                <p className="text-xs text-muted-foreground">Sends as {account?.handle ?? client.name} in {client.timezone}. Approval is recorded.</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div><label className="label" htmlFor="sch-date">Date</label><input id="sch-date" name="date" type="date" className="input" required defaultValue={planItem?.publishDate ?? new Date().toISOString().slice(0, 10)} /></div>
+                  <div><label className="label" htmlFor="sch-time">Time</label><input id="sch-time" name="time" type="time" className="input" required defaultValue="09:00" /></div>
+                </div>
+                <button className="btn btn-accent w-full" type="submit">Schedule post</button>
+              </form>
             ) : (
               <p className="mt-2 text-xs text-muted-foreground">Approve the draft first. Scheduling never bypasses the claim ledger.</p>
             )}

@@ -45,11 +45,11 @@ export function Chrome({ children, profile }: { children: React.ReactNode; profi
           <div className="container-x flex h-16 items-center justify-between">
             <Logo />
             <nav className="hidden items-center gap-6 text-sm font-medium text-muted-foreground sm:flex" aria-label="Primary">
+              <a className="transition-colors hover:text-foreground font-semibold text-accent" href="/clients">Dashboard</a>
               {PUBLIC_LINKS.map((l) => <a key={l.href} className="transition-colors hover:text-foreground" href={l.href}>{l.label}</a>)}
-              <a className="transition-colors hover:text-foreground" href="/signin">Sign in</a>
             </nav>
             <div className="flex items-center gap-2">
-              <a href="/signup" className="btn btn-accent btn-sm sm:!px-4 sm:!py-2 sm:!text-sm">Start free</a>
+              <a href="/clients" className="btn btn-accent btn-sm sm:!px-4 sm:!py-2 sm:!text-sm">Open Dashboard →</a>
             </div>
           </div>
         </header>

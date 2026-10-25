@@ -34,7 +34,7 @@ export default function Landing() {
               {PITCH} Curro stores what each client has approved, plans the month, drafts LinkedIn posts, X threads, reel scripts and SEO articles from that knowledge, and blocks unsupported claims before anything ships.
             </p>
             <div className="rise rise-3 mt-8 flex flex-wrap gap-3">
-              <a href="/signup" className="btn btn-accent btn-lg btn-glow">Start free in beta</a>
+              <a href="/clients" className="btn btn-accent btn-lg btn-glow">Open Dashboard →</a>
               <a href="/how-it-works" className="btn btn-outline btn-lg">See the full loop</a>
             </div>
             <p className="rise rise-4 mt-4 text-xs text-muted-foreground">

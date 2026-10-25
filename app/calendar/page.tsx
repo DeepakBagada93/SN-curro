@@ -6,6 +6,7 @@ import { monthKey, monthLabel, shiftMonth } from "@/lib/agency";
 import { CHANNEL_LABELS } from "@/lib/clients";
 import { formatInTimeZone } from "@/lib/time";
 import { EmptyState } from "@/components/ui";
+import { CopyButton } from "@/components/copy-button";
 
 export const dynamic = "force-dynamic";
 
@@ -204,6 +205,7 @@ export default async function CalendarPage({
                   {post.failureReason && <p className="text-[11px] text-destructive">{post.failureReason}</p>}
                 </div>
                 <div className="flex items-center gap-1.5">
+                  <CopyButton text={post.body} label="Copy" />
                   {post.assetId && <a href={`/studio/${post.assetId}`} className="btn btn-ghost btn-sm !px-2 !py-1 text-xs">Open</a>}
                   {post.status === "scheduled" && (
                     <>

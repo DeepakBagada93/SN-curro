@@ -3,6 +3,7 @@ import { loadDB, saveDB, audit, nowIso } from "@/lib/store";
 import { verifyReviewToken } from "@/lib/review";
 import { canApproveAsset } from "@/lib/agency";
 import { KNOWLEDGE_KIND_LABELS } from "@/lib/clients";
+import { CopyButton } from "@/components/copy-button";
 
 export const dynamic = "force-dynamic";
 
@@ -84,7 +85,10 @@ export default async function ReviewPage({
           <p className="eyebrow">{client?.name ?? "Client"} · review</p>
           <p className="mt-1 text-xs text-muted-foreground">Prepared by Curro · {version ? `version ${version.version}` : "draft"}</p>
         </div>
-        <span className={`badge ${already ? "badge-success" : "badge-warning"}`}>{asset.status.replace("_", " ")}</span>
+        <div className="flex items-center gap-2">
+          {version?.body && <CopyButton text={version.body} label="📋 Copy text" />}
+          <span className={`badge ${already ? "badge-success" : "badge-warning"}`}>{asset.status.replace("_", " ")}</span>
+        </div>
       </header>
 
       {params.token && searchParams.message === "approved" && <p className="alert alert-warning mt-4">Approved — thank you. The agency can now schedule or export it.</p>}

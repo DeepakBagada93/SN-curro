@@ -70,6 +70,44 @@ async function addKnowledge(clientId: string, formData: FormData) {
   revalidatePath(`/clients/${clientId}`);
 }
 
+async function ingestUrl(clientId: string, formData: FormData) {
+  "use server";
+  const { loadDB: l, saveDB, audit, uid, nowIso } = await import("@/lib/store");
+  const { scrapeUrlForKnowledge } = await import("@/lib/crawler");
+  const url = String(formData.get("crawlUrl") ?? "").trim();
+  if (!url) redirect(`/clients/${clientId}?error=invalid_url`);
+  const db = await l();
+  const client = db.clients.find((c) => c.id === clientId);
+  if (!client) return;
+
+  try {
+    const facts = await scrapeUrlForKnowledge(url);
+    const t = nowIso();
+    for (const f of facts) {
+      db.knowledgeItems.push({
+        id: uid("kn"),
+        workspaceId: client.workspaceId,
+        clientId: client.id,
+        kind: f.kind,
+        title: f.title,
+        body: f.body,
+        sourceUrl: url,
+        status: "candidate",
+        provenance: `Crawled from ${url}`,
+        tags: f.tags,
+        createdAt: t,
+        updatedAt: t,
+        approvedAt: null
+      });
+    }
+    await audit(db, "knowledge.crawled", "client", client.id);
+    await saveDB(db);
+    revalidatePath(`/clients/${clientId}`);
+  } catch {
+    redirect(`/clients/${clientId}?error=crawl_failed`);
+  }
+}
+
 async function setKnowledgeStatus(clientId: string, id: string, status: KnowledgeStatus) {
   "use server";
   const { loadDB: l, saveDB, audit, nowIso } = await import("@/lib/store");
@@ -221,7 +259,11 @@ export default async function ClientDetailPage({
             ? "Knowledge item not saved — add a title (3+ characters), body (10+ characters) and a valid kind."
             : searchParams.error === "plan"
               ? "Plan item not saved — add a title, channel and publish date."
-              : "Client details not saved — check the name and brand colour."}
+              : searchParams.error === "crawl_failed"
+                ? "Failed to crawl URL — check that the link is public and accessible."
+                : searchParams.error === "invalid_url"
+                  ? "Invalid URL provided — must start with https:// or http://."
+                  : "Client details not saved — check the name and brand colour."}
         </p>
       )}
 
@@ -372,6 +414,31 @@ export default async function ClientDetailPage({
         </section>
 
         <aside className="space-y-4 xl:sticky xl:top-4 xl:self-start">
+          <div className="card border-accent/30 bg-accent/5">
+            <p className="eyebrow text-accent">⚡ AI Web Ingestion</p>
+            <h2 className="h-display mt-1 text-xl">Ingest Client URL</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Paste a website URL or landing page. Curro crawls the page and extracts verified candidate facts automatically.
+            </p>
+            <form action={ingestUrl.bind(null, client.id)} className="mt-3 space-y-3">
+              <div>
+                <label className="label" htmlFor="crawlUrl">Target URL</label>
+                <input
+                  id="crawlUrl"
+                  name="crawlUrl"
+                  type="url"
+                  className="input"
+                  placeholder={client.website || "https://client.com/about"}
+                  defaultValue={client.website || ""}
+                  required
+                />
+              </div>
+              <button className="btn btn-accent w-full" type="submit">
+                Extract Facts with AI →
+              </button>
+            </form>
+          </div>
+
           <div className="card">
             <p className="eyebrow">Add knowledge</p>
             <h2 className="h-display mt-1 text-xl">Teach the brain</h2>

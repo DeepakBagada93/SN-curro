@@ -2,7 +2,7 @@
 // The API key is read from the server environment and never returned in errors.
 
 const BASE_URL = process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1";
-const DEFAULT_CHEAP = "minimax/minimax-m3.1-flash:free";
+const DEFAULT_CHEAP = "nvidia/nemotron-3.5-lightning:free";
 const DEFAULT_STRONG = "nvidia/nemotron-3.5-super-vl:free";
 const FALLBACK_MODEL: Record<ModelTier, string> = {
   cheap: DEFAULT_CHEAP,
