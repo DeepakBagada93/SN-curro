@@ -1,56 +1,12 @@
 import type { Metadata } from "next";
 import { COMPARISON, PRICING_FAQS } from "@/lib/content";
-import { PLAN_CATALOG, PLAN_ORDER } from "@/lib/agency";
+import { PricingTable } from "@/components/pricing-table";
 import { Reveal } from "@/components/motion";
 
 export const metadata: Metadata = {
-  title: "Pricing",
+  title: "Pricing — Made for Indian Agencies & Export Businesses",
   description:
-    "Curro plans for solo consultants through multi-client agencies: client knowledge brains, planning, claim-checked drafts, client review links and a publishing calendar. Free during beta."
-};
-
-const TIER_DETAILS: Record<string, { cta: string; highlight?: boolean; rows: string[] }> = {
-  solo: {
-    cta: "Start with one client",
-    rows: [
-      "1 client Knowledge Brain",
-      "30 generations / month",
-      "10 branded images / month",
-      "Planner, claim ledger, review links",
-      "1 seat"
-    ]
-  },
-  studio: {
-    cta: "Start a studio",
-    highlight: true,
-    rows: [
-      "5 client Knowledge Brains",
-      "150 generations / month",
-      "50 images / month",
-      "Client review links + calendar",
-      "2 seats"
-    ]
-  },
-  agency: {
-    cta: "Run the agency",
-    rows: [
-      "20 client Knowledge Brains",
-      "600 generations / month",
-      "200 images / month",
-      "API keys + MCP tools",
-      "10 seats"
-    ]
-  },
-  enterprise: {
-    cta: "Talk to us",
-    rows: [
-      "Custom client and generation caps",
-      "Custom image allowance",
-      "API keys, MCP and security review",
-      "Dedicated onboarding",
-      "Custom seats"
-    ]
-  }
+    "Curro pricing engineered for Indian digital marketing, performance & SEO agencies: client knowledge brains, automated 30-day planner, claim-verified AI drafts, client approval links and publishing calendar."
 };
 
 const INCLUDED = [
@@ -70,44 +26,20 @@ export default function Pricing() {
   return (
     <div>
       <section className="container-x max-w-3xl py-16 text-center md:py-24">
-        <p className="eyebrow rise">Pricing</p>
-        <h1 className="h-display rise rise-1 mt-3 text-4xl md:text-5xl">Priced per workspace, not per prompt.</h1>
+        <p className="eyebrow rise">India-First Pricing</p>
+        <h1 className="h-display rise rise-1 mt-3 text-4xl md:text-5xl">
+          Priced for Indian agencies. Built to scale client context.
+        </h1>
         <p className="prose-muted rise rise-2 mt-4 text-lg">
-          Generic writers charge for words. Curro charges for the account: approved client knowledge, a plan, claim-checked drafts, client approval and a publishing calendar.
+          Replace 5 fragmented tools and stop paying ₹30,000/mo for manual rewriting. Curro gives your agency verified client memory, claim-checked AI drafts, and seat-free review links at transparent Indian pricing.
         </p>
-        <p className="rise rise-3 mt-4 inline-flex rounded-full border border-success/40 bg-success/5 px-4 py-2 text-sm text-success">
-          Beta access is free today. Prices below are launch prices — no card required.
+        <p className="rise rise-3 mt-4 inline-flex items-center gap-2 rounded-full border border-success/40 bg-success/5 px-4 py-2 text-sm text-success">
+          <span>🇮🇳</span> Launch Pricing · 100% GST Invoices with ITC · UPI & RuPay Supported
         </p>
       </section>
 
-      <section className="container-x grid max-w-6xl gap-6 md:grid-cols-2 xl:grid-cols-4">
-        {PLAN_ORDER.map((tier, i) => {
-          const plan = PLAN_CATALOG[tier];
-          const detail = TIER_DETAILS[tier];
-          return (
-            <Reveal key={tier} delay={i * 120}>
-              <div className={`card card-hover flex h-full flex-col ${detail.highlight ? "!border-accent" : ""}`}>
-                <div className="flex items-center justify-between gap-2">
-                  <h2 className="h-display text-xl">{plan.label}</h2>
-                  {detail.highlight && <span className="badge badge-accent">Most agencies</span>}
-                </div>
-                <p className="mt-2">
-                  <span className="font-display text-5xl font-semibold">{plan.price}</span>{" "}
-                  <span className="text-muted-foreground">{plan.cadence}</span>
-                </p>
-                <p className="prose-muted mt-2 text-sm">{plan.blurb}</p>
-                <ul className="mt-4 flex-1 space-y-2 text-sm">
-                  {detail.rows.map((r) => (
-                    <li key={r} className="flex gap-2"><span className="text-success" aria-hidden>✓</span>{r}</li>
-                  ))}
-                </ul>
-                <a href="/signup" className={`btn mt-6 w-full ${detail.highlight ? "btn-accent btn-glow" : "btn-outline"}`}>
-                  {detail.cta}
-                </a>
-              </div>
-            </Reveal>
-          );
-        })}
+      <section className="container-x max-w-6xl pb-16">
+        <PricingTable />
       </section>
 
       <section className="container-x max-w-5xl py-16">

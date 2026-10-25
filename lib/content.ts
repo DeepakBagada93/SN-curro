@@ -203,42 +203,42 @@ export const BEFORE_AFTER = [
 export const COMPARISON = [
   {
     name: "Generic AI writers",
-    price: "from $20/mo",
+    price: "₹2,000+/mo ($29)",
     row: [
-      "Start from a blank prompt",
-      "No per-client memory",
-      "Claims left to the writer",
-      "Copy only — no plan or approval"
+      "Starts from a blank prompt",
+      "No client memory or brand guidelines",
+      "Hallucinates facts & fake statistics",
+      "Copy only — no planner or review links"
     ]
   },
   {
-    name: "SEO content tools",
-    price: "from $99/mo",
+    name: "SEO keyword tools",
+    price: "₹8,000+/mo ($99)",
     row: [
-      "Start from a keyword brief",
-      "Research, not client truth",
-      "Editorial QA is manual",
-      "Articles only"
+      "Starts from raw keyword volumes",
+      "Unaware of client's brand voice",
+      "Manual QA required for every fact",
+      "Long-form articles only"
     ]
   },
   {
-    name: "Agency PM + docs",
-    price: "from $10/seat",
+    name: "Disconnected tool stack (Docs + Buffer + Notion)",
+    price: "₹6,000+/mo",
     row: [
-      "Context lives in documents",
-      "No generation, no claim check",
-      "Approvals in email threads",
-      "Calendar disconnected from copy"
+      "Client context scattered in 10 folders",
+      "No automated claim ledger or fact checks",
+      "Approvals lost in WhatsApp & Slack chats",
+      "High human effort & context switching"
     ]
   },
   {
-    name: "Curro",
-    price: "$39/mo at launch",
+    name: "Curro (Agency Knowledge OS)",
+    price: "₹999/mo (Early Bird)",
     row: [
       "Starts from approved client knowledge",
-      "One brain per client, with provenance",
-      "Claim ledger blocks unsupported lines",
-      "Plan → draft → approve → schedule"
+      "One persistent brain per client with live URL crawler",
+      "Claim ledger blocks unsupported lines automatically",
+      "Plan → Draft → Client Review Link → Schedule loop"
     ],
     highlight: true
   }
@@ -281,20 +281,28 @@ export const FAQS = [
 
 export const PRICING_FAQS = [
   {
-    q: "Is there a free trial?",
-    a: "The beta is free to use while we finish billing. The prices on this page are launch prices, and no card is required today. When billing opens, you will choose a plan before the workspace continues."
+    q: "Do you support Indian payment methods like UPI, RuPay & NetBanking?",
+    a: "Yes! We support all Indian payment options including UPI (Google Pay, PhonePe, Paytm, BHIM), RuPay cards, Visa, Mastercard, American Express, NetBanking, and international cards."
+  },
+  {
+    q: "Can Indian businesses claim GST input tax credit (ITC)?",
+    a: "Absolutely. All invoices include 18% GST with your business name and GSTIN so you can claim 100% input tax credit (ITC) on your monthly returns."
+  },
+  {
+    q: "How does Curro compare to hiring a content writer in India?",
+    a: "A mid-level content writer in India costs ₹25,000 to ₹45,000/month and often struggles to maintain context across 5+ accounts. Curro empowers your existing account managers to produce claim-checked, client-verified content in minutes at just ₹99/day."
+  },
+  {
+    q: "Do my agency clients need to pay for seats to review drafts?",
+    a: "Zero cost for clients. You can generate secure, 7-day review links that you can send over WhatsApp or email. Your clients can review the draft, check cited facts, and approve or request edits with zero login or extra seat charges."
   },
   {
     q: "What counts as a generation?",
-    a: "One draft created in the studio, including regenerated drafts. Planning a month of slots costs nothing until you turn a slot into a draft. Image generation is counted separately."
+    a: "One full-length draft generated in the studio (e.g. LinkedIn thought-leadership post, multi-tweet thread, reel script, or SEO pillar section). Month planning, crawling client URLs, and client approvals do not consume your generation quota."
   },
   {
-    q: "Do client reviewers need a paid seat?",
-    a: "No. Review links are intentionally seat-free. You pay for the people doing the work, not for the client who signs it off."
-  },
-  {
-    q: "Can we change plan mid-month?",
-    a: "Yes. Caps apply to the plan on the workspace, and usage is measured over a rolling 30-day window. Downgrading never deletes existing clients, knowledge or drafts."
+    q: "Can I upgrade or switch to annual billing later?",
+    a: "Yes, you can upgrade your plan anytime from Settings. Choosing annual billing gives you 2 months free (save an extra 17%)."
   }
 ];
 

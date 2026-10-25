@@ -3,17 +3,98 @@ import type { AssetFormat, AssetStatus, Channel, ClaimEntry, ContentAsset, Conte
 export const PLAN_CATALOG: Record<PlanTier, {
   label: string;
   price: string;
+  originalPrice: string;
+  priceInr: string;
+  originalPriceInr: string;
+  priceUsd: string;
+  originalPriceUsd: string;
+  annualPriceInr: string;
+  annualPriceUsd: string;
+  dailyInr: string;
   cadence: string;
   clients: number;
   generations: number;
   images: number;
   seats: number;
   blurb: string;
+  badge?: string;
+  highlight?: boolean;
 }> = {
-  solo: { label: "Solo", price: "$39", cadence: "/mo", clients: 1, generations: 30, images: 10, seats: 1, blurb: "One client, the full knowledge-to-publish loop." },
-  studio: { label: "Studio", price: "$99", cadence: "/mo", clients: 5, generations: 150, images: 50, seats: 2, blurb: "For a small SEO/social team running several accounts." },
-  agency: { label: "Agency", price: "$249", cadence: "/mo", clients: 20, generations: 600, images: 200, seats: 10, blurb: "Multi-client workspace with approvals and integrations." },
-  enterprise: { label: "Enterprise", price: "Custom", cadence: "", clients: 999, generations: 9999, images: 9999, seats: 999, blurb: "SSO, custom limits, dedicated onboarding, MCP/API." }
+  solo: {
+    label: "Freelancer & Consultant",
+    price: "₹999",
+    originalPrice: "₹1,999",
+    priceInr: "₹999",
+    originalPriceInr: "₹1,999",
+    priceUsd: "$19",
+    originalPriceUsd: "$39",
+    annualPriceInr: "₹799",
+    annualPriceUsd: "$15",
+    dailyInr: "₹33/day",
+    cadence: "/month",
+    clients: 2,
+    generations: 50,
+    images: 20,
+    seats: 1,
+    blurb: "Ideal for solo marketing consultants, freelance SEOs & creators managing 1–2 client brands."
+  },
+  studio: {
+    label: "Growth Agency",
+    price: "₹2,999",
+    originalPrice: "₹5,999",
+    priceInr: "₹2,999",
+    originalPriceInr: "₹5,999",
+    priceUsd: "$49",
+    originalPriceUsd: "$99",
+    annualPriceInr: "₹2,499",
+    annualPriceUsd: "$39",
+    dailyInr: "₹99/day",
+    cadence: "/month",
+    clients: 6,
+    generations: 200,
+    images: 75,
+    seats: 3,
+    blurb: "The sweet spot for boutique Indian digital marketing, performance & SEO agencies.",
+    badge: "Most Popular in India",
+    highlight: true
+  },
+  agency: {
+    label: "Scale Agency",
+    price: "₹6,999",
+    originalPrice: "₹12,999",
+    priceInr: "₹6,999",
+    originalPriceInr: "₹12,999",
+    priceUsd: "$119",
+    originalPriceUsd: "$249",
+    annualPriceInr: "₹5,799",
+    annualPriceUsd: "$99",
+    dailyInr: "₹233/day",
+    cadence: "/month",
+    clients: 25,
+    generations: 800,
+    images: 300,
+    seats: 10,
+    blurb: "Multi-client agency powerhouse with seat-free client review links, calendar & MCP API.",
+    badge: "Best for 10+ Accounts"
+  },
+  enterprise: {
+    label: "Enterprise / Network",
+    price: "₹19,999",
+    originalPrice: "₹35,000",
+    priceInr: "₹19,999",
+    originalPriceInr: "₹35,000",
+    priceUsd: "$299",
+    originalPriceUsd: "$499",
+    annualPriceInr: "₹16,499",
+    annualPriceUsd: "$249",
+    dailyInr: "Custom",
+    cadence: "/month",
+    clients: 999,
+    generations: 9999,
+    images: 9999,
+    seats: 999,
+    blurb: "Unlimited brands, dedicated Indian account manager, custom regional prompt tuning & GST invoice."
+  }
 };
 
 export const PLAN_ORDER: PlanTier[] = ["solo", "studio", "agency", "enterprise"];
