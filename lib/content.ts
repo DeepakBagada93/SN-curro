@@ -281,6 +281,10 @@ export const FAQS = [
 
 export const PRICING_FAQS = [
   {
+    q: "How does the 3-Day Free Trial work? Do I need a credit card?",
+    a: "You get 72 hours of unrestricted full-access to all Curro features immediately upon signing up — including multi-client Knowledge Brains, live URL crawler, AI studio, and calendar. Zero credit card or UPI details are required to start."
+  },
+  {
     q: "Do you support Indian payment methods like UPI, RuPay & NetBanking?",
     a: "Yes! We support all Indian payment options including UPI (Google Pay, PhonePe, Paytm, BHIM), RuPay cards, Visa, Mastercard, American Express, NetBanking, and international cards."
   },

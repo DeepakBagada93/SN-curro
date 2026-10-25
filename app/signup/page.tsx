@@ -16,9 +16,9 @@ export default function SignUp({ searchParams }: { searchParams: { error?: strin
   return (
     <div className="container-x max-w-md py-16 md:py-24">
       <div className="rise text-center">
-        <p className="eyebrow">Get started</p>
-        <h1 className="h-display mt-2 text-4xl">Build your agency&apos;s knowledge OS.</h1>
-        <p className="prose-muted mt-2 text-sm">One workspace for every client. Free during beta, no card, and a demo university account ready to explore.</p>
+        <p className="eyebrow">3-Day Free Trial</p>
+        <h1 className="h-display mt-2 text-4xl">Start your 3-day full-access trial.</h1>
+        <p className="prose-muted mt-2 text-sm">No credit card or UPI required. Full access to client knowledge brains, AI studio, and publishing calendar.</p>
       </div>
       {searchParams.error && (
         <p className="alert alert-danger mt-6" role="alert">{ERRORS[searchParams.error] ?? "Sign-up failed. Please try again."}</p>

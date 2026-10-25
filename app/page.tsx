@@ -26,7 +26,7 @@ export default function Landing() {
         <div className="orb right-[-100px] top-[120px] h-64 w-64 bg-accent/10" style={{ animationDelay: "-5s" }} aria-hidden />
         <div className="container-x relative grid items-center gap-12 py-16 md:py-24 lg:grid-cols-[1.05fr_0.95fr]">
           <div>
-            <p className="badge badge-accent rise">● Agency Knowledge OS · beta</p>
+            <p className="badge badge-accent rise">● 3-Day Free Trial · Zero Card Required</p>
             <h1 className="h-display rise rise-1 mt-5 max-w-2xl text-4xl leading-[1.05] md:text-6xl">
               Every client. One <span className="text-accent">approved brain</span>. Content that survives review.
             </h1>
@@ -34,11 +34,11 @@ export default function Landing() {
               {PITCH} Curro stores what each client has approved, plans the month, drafts LinkedIn posts, X threads, reel scripts and SEO articles from that knowledge, and blocks unsupported claims before anything ships.
             </p>
             <div className="rise rise-3 mt-8 flex flex-wrap gap-3">
-              <a href="/clients" className="btn btn-accent btn-lg btn-glow">Open Dashboard →</a>
-              <a href="/how-it-works" className="btn btn-outline btn-lg">See the full loop</a>
+              <a href="/signup" className="btn btn-accent btn-lg btn-glow">Start 3-Day Free Trial →</a>
+              <a href="/clients" className="btn btn-outline btn-lg">Open Dashboard</a>
             </div>
             <p className="rise rise-4 mt-4 text-xs text-muted-foreground">
-              Free during beta · No credit card · No auto-publishing · Client review without seats
+              3-day full-access trial · No credit card or UPI required · 100% Indian GST compliant
             </p>
           </div>
 
@@ -339,7 +339,7 @@ export default function Landing() {
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <a href="/pricing" className="btn btn-outline transition-transform hover:-translate-y-0.5">Compare plans →</a>
-            <a href="/signup" className="btn btn-accent">Start free in beta</a>
+            <a href="/signup" className="btn btn-accent">Start 3-Day Free Trial →</a>
           </div>
         </Reveal>
       </section>
@@ -377,8 +377,8 @@ export default function Landing() {
               Create a workspace, add one client, approve a handful of facts. Your first claim-checked draft is five steps away.
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-3">
-              <a href="/signup" className="btn btn-accent btn-lg btn-glow">Create your workspace</a>
-              <a href="/how-it-works" className="btn btn-outline btn-lg">Walk the loop</a>
+              <a href="/signup" className="btn btn-accent btn-lg btn-glow">Start 3-Day Free Trial →</a>
+              <a href="/clients" className="btn btn-outline btn-lg">Explore Dashboard</a>
             </div>
           </Reveal>
         </div>

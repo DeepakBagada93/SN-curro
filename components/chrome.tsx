@@ -49,7 +49,8 @@ export function Chrome({ children, profile }: { children: React.ReactNode; profi
               {PUBLIC_LINKS.map((l) => <a key={l.href} className="transition-colors hover:text-foreground" href={l.href}>{l.label}</a>)}
             </nav>
             <div className="flex items-center gap-2">
-              <a href="/clients" className="btn btn-accent btn-sm sm:!px-4 sm:!py-2 sm:!text-sm">Open Dashboard →</a>
+              <a href="/pricing" className="btn btn-outline btn-sm sm:!px-3 sm:!py-1.5 sm:!text-xs">Pricing</a>
+              <a href="/signup" className="btn btn-accent btn-sm sm:!px-4 sm:!py-2 sm:!text-sm">Start 3-Day Trial →</a>
             </div>
           </div>
         </header>
@@ -133,6 +134,16 @@ export function Chrome({ children, profile }: { children: React.ReactNode; profi
         </div>
       </aside>
       <div className="min-w-0 flex-1">
+        <div className="border-b border-border bg-accent/5 px-4 py-2 text-xs text-foreground">
+          <div className="container-x flex flex-wrap items-center justify-between gap-2">
+            <span className="flex items-center gap-1.5 font-medium">
+              <span className="text-accent">⏳</span> <strong>3-Day Agency Trial Active</strong> — All features unlocked. Keep your client memory safe.
+            </span>
+            <a href="/pricing" className="font-semibold text-accent hover:underline">
+              View Plans & Pricing (from ₹999/mo) →
+            </a>
+          </div>
+        </div>
         <main className="container-x py-6 lg:py-8">{children}</main>
         <p className="container-x pb-8 text-xs text-muted-foreground">Curro · no auto-publishing · unsupported claims block approval.</p>
       </div>

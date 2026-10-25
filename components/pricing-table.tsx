@@ -47,6 +47,13 @@ export function PricingTable() {
 
   return (
     <div>
+      {/* 3-Day Free Trial Callout */}
+      <div className="mb-6 flex justify-center">
+        <span className="inline-flex items-center gap-2 rounded-full border border-accent/40 bg-accent/10 px-4 py-1.5 text-xs font-bold text-accent">
+          <span>⚡</span> 3-Day Full-Access Free Trial on All Plans · Zero Credit Card or UPI Required
+        </span>
+      </div>
+
       {/* Toggles Bar */}
       <div className="flex flex-wrap items-center justify-center gap-4 pb-10">
         {/* Currency Switcher */}
@@ -182,7 +189,7 @@ export function PricingTable() {
                     isHighlight ? "btn-accent btn-glow" : "btn-outline"
                   }`}
                 >
-                  {tier === "enterprise" ? "Contact Team →" : "Get Started Now →"}
+                  {tier === "enterprise" ? "Contact Team →" : "Start 3-Day Free Trial →"}
                 </a>
               </div>
             </div>
