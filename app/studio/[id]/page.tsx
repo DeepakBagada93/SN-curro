@@ -7,6 +7,7 @@ import { KNOWLEDGE_KIND_LABELS, CHANNEL_LABELS } from "@/lib/clients";
 import { createReviewToken } from "@/lib/review";
 import { formatInTimeZone, zonedTimeToUtc } from "@/lib/time";
 import { CopyButton } from "@/components/copy-button";
+import { SubmitButton } from "@/components/submit-button";
 import type { ClaimEntry, ContentAsset } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -377,7 +378,11 @@ export default async function StudioAssetPage({
             )}
             {!locked && (
               <div className="mt-3 flex flex-wrap gap-2">
-                <form action={approveAsset.bind(null, asset.id)}><button className="btn btn-accent btn-sm" type="submit" disabled={!check.ok}>Approve draft</button></form>
+                <form action={approveAsset.bind(null, asset.id)}>
+                  <SubmitButton pendingText="Approving draft…" className="btn btn-accent btn-sm" disabled={!check.ok}>
+                    Approve draft
+                  </SubmitButton>
+                </form>
                 <form action={rejectAsset.bind(null, asset.id)}><button className="btn btn-outline btn-sm" type="submit">Reject</button></form>
               </div>
             )}

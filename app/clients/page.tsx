@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { loadDB } from "@/lib/store";
 import { CLIENT_COLORS, TIMEZONES, initials, knowledgeStats } from "@/lib/clients";
 import { EmptyState } from "@/components/ui";
+import { ClientList, type ClientCardData } from "@/components/client-list";
+import { SubmitButton } from "@/components/submit-button";
 
 export const dynamic = "force-dynamic";
 
@@ -89,61 +91,27 @@ export default async function ClientsPage({ searchParams }: { searchParams: { er
           />
         </div>
       ) : (
-        <div className="anim-list grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {db.clients.map((c) => {
+        <ClientList
+          clients={db.clients.map((c): ClientCardData => {
             const items = db.knowledgeItems.filter((k) => k.clientId === c.id);
             const ks = knowledgeStats(items);
             const next = db.planItems
               .filter((p) => p.clientId === c.id && p.status !== "published")
               .sort((a, b) => a.publishDate.localeCompare(b.publishDate))[0];
-            return (
-              <a key={c.id} href={`/clients/${c.id}`} className="card card-hover flex flex-col overflow-hidden !p-0">
-                <div className="h-1.5 w-full" style={{ background: c.brandColor }} aria-hidden />
-                <div className="flex flex-1 flex-col p-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <span
-                        className="grid h-11 w-11 shrink-0 place-items-center rounded-xl font-display text-sm font-bold text-white"
-                        style={{ background: c.brandColor }}
-                        aria-hidden
-                      >
-                        {initials(c.name)}
-                      </span>
-                      <div className="min-w-0">
-                        <h2 className="truncate font-display text-lg font-semibold leading-tight">{c.name}</h2>
-                        <p className="truncate text-xs text-muted-foreground">{c.industry || "No industry set"}</p>
-                      </div>
-                    </div>
-                    <span className={`badge ${c.status === "active" ? "badge-success" : "badge-muted"}`}>{c.status}</span>
-                  </div>
-
-                  <p className="prose-muted mt-3 line-clamp-2 text-sm">
-                    {c.summary || "No strategy summary yet — open the client to add one."}
-                  </p>
-
-                  <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
-                    <div className="rounded-lg bg-muted/60 py-1.5">
-                      <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">Approved</dt>
-                      <dd className="font-display text-base font-semibold">{ks.approved}</dd>
-                    </div>
-                    <div className="rounded-lg bg-muted/60 py-1.5">
-                      <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">Review</dt>
-                      <dd className="font-display text-base font-semibold">{ks.candidate}</dd>
-                    </div>
-                    <div className="rounded-lg bg-muted/60 py-1.5">
-                      <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">Planned</dt>
-                      <dd className="font-display text-base font-semibold">{db.planItems.filter((p) => p.clientId === c.id).length}</dd>
-                    </div>
-                  </dl>
-
-                  <p className="mt-auto pt-4 text-xs text-muted-foreground">
-                    {next ? `Next: ${next.publishDate} · ${next.title}` : "No content planned yet · open the brain →"}
-                  </p>
-                </div>
-              </a>
-            );
+            return {
+              id: c.id,
+              name: c.name,
+              industry: c.industry || "",
+              summary: c.summary || "",
+              brandColor: c.brandColor,
+              status: c.status,
+              approvedCount: ks.approved,
+              candidateCount: ks.candidate,
+              plannedCount: db.planItems.filter((p) => p.clientId === c.id).length,
+              nextPost: next ? { date: next.publishDate, title: next.title } : null
+            };
           })}
-        </div>
+        />
       )}
 
       <div className="card" id="add-client">
@@ -200,7 +168,9 @@ export default async function ClientsPage({ searchParams }: { searchParams: { er
             <textarea id="restrictedClaims" name="restrictedClaims" className="input min-h-[70px]" placeholder="No salary, ranking or completion-time claims without a cited source." maxLength={800} />
           </div>
           <div className="sm:col-span-2">
-            <button className="btn btn-accent" type="submit">Create client & open brain →</button>
+            <SubmitButton pendingText="Creating client & initializing brain…" className="btn btn-accent">
+              Create client &amp; open brain →
+            </SubmitButton>
           </div>
         </form>
       </div>

@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { loadDB } from "@/lib/store";
 import { canTransition } from "@/lib/generation";
 import { diffLines } from "@/lib/diff";
+import { SubmitButton } from "@/components/submit-button";
 
 export const dynamic = "force-dynamic";
 
@@ -70,7 +71,13 @@ export default async function DraftPage({ params }: { params: { id: string } }) 
           <p className="text-xs text-muted-foreground">Curro ends at approve + copy. Publishing is deliberately absent.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {(["in_review", "draft"] as const).includes(asset.status as never) && <form action={setStatus.bind(null, asset.id, "approved")}><button className="btn btn-accent btn-sm" type="submit">✓ Approve</button></form>}
+          {(["in_review", "draft"] as const).includes(asset.status as never) && (
+            <form action={setStatus.bind(null, asset.id, "approved")}>
+              <SubmitButton pendingText="Approving…" className="btn btn-accent btn-sm">
+                ✓ Approve
+              </SubmitButton>
+            </form>
+          )}
           <form action={setStatus.bind(null, asset.id, "rejected")}><button className="btn btn-outline btn-sm" type="submit">Reject</button></form>
           <form action={setStatus.bind(null, asset.id, "archived")}><button className="btn btn-outline btn-sm" type="submit">Archive</button></form>
         </div>

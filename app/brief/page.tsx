@@ -1,6 +1,7 @@
 import { loadDB } from "@/lib/store";
 import { BETA_ALLOWANCE } from "@/lib/types";
 import { ScoreBar } from "@/components/ui";
+import { SubmitButton } from "@/components/submit-button";
 
 export const dynamic = "force-dynamic";
 
@@ -66,7 +67,11 @@ export default async function BriefPage() {
           <p className="mt-2 text-sm"><strong>{BETA_ALLOWANCE.briefs - runsUsed} briefs</strong> <span className="text-muted-foreground">and</span> <strong>{BETA_ALLOWANCE.drafts - draftsUsed} drafts</strong> <span className="text-muted-foreground">included in your free plan.</span></p>
         </div>
         <div className="flex flex-col gap-2">
-          <form action={runBrief}><button className="btn btn-accent" type="submit">↻ Run brief manually</button></form>
+          <form action={runBrief}>
+            <SubmitButton pendingText="Searching web & scoring signals…" className="btn btn-accent">
+              ↻ Run brief manually
+            </SubmitButton>
+          </form>
           {latestRun && <a href={`/api/export/brief/${latestRun.id}`} className="btn btn-outline btn-sm">⬇ Export brief (.md)</a>}
         </div>
       </div>
@@ -85,7 +90,11 @@ export default async function BriefPage() {
             <div className="grid h-12 w-12 place-items-center rounded-2xl bg-muted text-2xl" aria-hidden>◈</div>
             <h2 className="h-display mt-4 text-xl">A quiet desk, ready for signal.</h2>
             <p className="prose-muted mt-1 max-w-md text-sm">Run your first manual brief to get up to three cited Signal Cards. If the provider fails you&apos;ll see a safe error — Curro never invents results to fill the silence.</p>
-            <form action={runBrief} className="mt-4"><button className="btn btn-accent" type="submit">Run my first brief</button></form>
+            <form action={runBrief} className="mt-4">
+              <SubmitButton pendingText="Searching web & scoring signals…" className="btn btn-accent">
+                Run my first brief
+              </SubmitButton>
+            </form>
           </div>
         </div>
       ) : (

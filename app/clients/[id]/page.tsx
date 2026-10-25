@@ -2,6 +2,8 @@ import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { loadDB } from "@/lib/store";
 import { CrawlForm } from "@/components/crawl-form";
+import { KnowledgeBrainManager } from "@/components/knowledge-brain-manager";
+import { SubmitButton } from "@/components/submit-button";
 import {
   CHANNELS,
   CHANNEL_LABELS,
@@ -124,19 +126,56 @@ async function ingestUrl(clientId: string, formData: FormData) {
   }
 }
 
-async function setKnowledgeStatus(clientId: string, id: string, status: KnowledgeStatus) {
+async function setKnowledgeStatus(
+  clientId: string,
+  id: string,
+  status: KnowledgeStatus
+): Promise<{ ok: boolean; error?: string }> {
   "use server";
-  const { loadDB: l, saveDB, audit, nowIso } = await import("@/lib/store");
-  const db = await l();
-  const item = db.knowledgeItems.find((k) => k.id === id && k.clientId === clientId);
-  if (!item) return;
-  const t = nowIso();
-  item.status = status;
-  item.updatedAt = t;
-  if (status === "approved") item.approvedAt = t;
-  await audit(db, `knowledge.${status}`, "knowledge_item", id);
-  await saveDB(db);
-  revalidatePath(`/clients/${clientId}`);
+  try {
+    const { loadDB: l, saveDB, audit, nowIso } = await import("@/lib/store");
+    const db = await l();
+    const item = db.knowledgeItems.find((k) => k.id === id && k.clientId === clientId);
+    if (!item) return { ok: false, error: "Knowledge item not found." };
+    const t = nowIso();
+    item.status = status;
+    item.updatedAt = t;
+    if (status === "approved") item.approvedAt = t;
+    await audit(db, `knowledge.${status}`, "knowledge_item", id);
+    await saveDB(db);
+    revalidatePath(`/clients/${clientId}`);
+    return { ok: true };
+  } catch (err: unknown) {
+    const error = err instanceof Error ? err.message : "Failed to update status";
+    return { ok: false, error };
+  }
+}
+
+async function approveAllCandidates(
+  clientId: string
+): Promise<{ ok: boolean; count: number; error?: string }> {
+  "use server";
+  try {
+    const { loadDB: l, saveDB, audit, nowIso } = await import("@/lib/store");
+    const db = await l();
+    const candidates = db.knowledgeItems.filter(
+      (k) => k.clientId === clientId && k.status === "candidate"
+    );
+    if (candidates.length === 0) return { ok: true, count: 0 };
+    const t = nowIso();
+    for (const item of candidates) {
+      item.status = "approved";
+      item.updatedAt = t;
+      item.approvedAt = t;
+      await audit(db, "knowledge.approved", "knowledge_item", item.id);
+    }
+    await saveDB(db);
+    revalidatePath(`/clients/${clientId}`);
+    return { ok: true, count: candidates.length };
+  } catch (err: unknown) {
+    const error = err instanceof Error ? err.message : "Failed to approve candidates";
+    return { ok: false, count: 0, error };
+  }
 }
 
 async function updateClient(clientId: string, formData: FormData) {
@@ -352,98 +391,12 @@ export default async function ClientDetailPage({
       </section>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <section id="knowledge" className="space-y-4">
-          <div className="card !p-4">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <p className="eyebrow">Knowledge Brain</p>
-                <h2 className="h-display text-2xl">What the agency knows</h2>
-              </div>
-              <p className="text-xs text-muted-foreground">{filtered.length} of {all.length} items</p>
-            </div>
-            <form method="get" className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto_auto_auto]">
-              <input name="q" defaultValue={q} className="input" placeholder="Search facts, research, tags…" aria-label="Search knowledge" />
-              <select name="kind" defaultValue={kind ?? ""} className="input sm:!w-40" aria-label="Filter by kind">
-                <option value="">All kinds</option>
-                {KNOWLEDGE_KINDS.map((k) => <option key={k} value={k}>{KNOWLEDGE_KIND_LABELS[k]}</option>)}
-              </select>
-              <select name="status" defaultValue={status ?? ""} className="input sm:!w-36" aria-label="Filter by status">
-                <option value="">All statuses</option>
-                <option value="approved">Approved</option>
-                <option value="candidate">Candidate</option>
-                <option value="archived">Archived</option>
-              </select>
-              <button className="btn" type="submit">Filter</button>
-            </form>
-            {(q || kind || status) && <p className="mt-2 text-xs"><a className="text-accent hover:underline" href={clearHref}>Clear filters</a></p>}
-          </div>
-
-          <p className="alert alert-warning">
-            Only <strong>approved</strong> knowledge may be used for drafting. Candidates stay quarantined until a human verifies them.
-          </p>
-
-          {filtered.length === 0 ? (
-            <div className="card">
-              <div className="empty !py-10">
-                <div className="grid h-12 w-12 place-items-center rounded-2xl bg-muted text-2xl" aria-hidden>❖</div>
-                <h3 className="h-display mt-4 text-lg">{all.length === 0 ? "The brain is empty." : "Nothing matches these filters."}</h3>
-                <p className="prose-muted mt-1 max-w-md text-sm">
-                  {all.length === 0
-                    ? "Add the first approved brand fact or source document on the right. Generation stays blocked until at least one fact is approved."
-                    : "Clear the filters or add a new item."}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="anim-list space-y-3">
-              {filtered.map((item) => (
-                <article key={item.id} className="rounded-xl border border-border bg-card p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                        {KNOWLEDGE_KIND_ICONS[item.kind]} {KNOWLEDGE_KIND_LABELS[item.kind]}
-                      </p>
-                      <h3 className="mt-0.5 font-display text-lg font-semibold leading-snug">{item.title}</h3>
-                    </div>
-                    <span className={`badge ${STATUS_BADGE[item.status]}`}>{item.status}</span>
-                  </div>
-                  <p className="mt-2 whitespace-pre-line text-sm text-muted-foreground">{item.body}</p>
-                  {item.sourceUrl && (
-                    <a href={item.sourceUrl} target="_blank" rel="noreferrer" className="mt-2 inline-block break-all text-xs font-semibold text-accent hover:underline">
-                      Source ↗ {item.sourceUrl.replace(/^https?:\/\//, "")}
-                    </a>
-                  )}
-                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                    {item.tags.map((tag) => <span key={tag} className="badge badge-muted">#{tag}</span>)}
-                  </div>
-                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-2.5">
-                    <p className="font-mono text-[11px] text-muted-foreground">
-                      {item.provenance} · {item.updatedAt.slice(0, 10)}
-                      {item.approvedAt ? ` · approved ${item.approvedAt.slice(0, 10)}` : ""}
-                    </p>
-                    <div className="flex gap-1.5">
-                      {item.status !== "approved" && (
-                        <form action={setKnowledgeStatus.bind(null, client.id, item.id, "approved")}>
-                          <button className="btn btn-sm !px-2.5 !py-1 text-xs" type="submit">✓ Approve</button>
-                        </form>
-                      )}
-                      {item.status !== "archived" && (
-                        <form action={setKnowledgeStatus.bind(null, client.id, item.id, "archived")}>
-                          <button className="btn btn-outline btn-sm !px-2.5 !py-1 text-xs" type="submit">Archive</button>
-                        </form>
-                      )}
-                      {item.status === "archived" && (
-                        <form action={setKnowledgeStatus.bind(null, client.id, item.id, "candidate")}>
-                          <button className="btn btn-outline btn-sm !px-2.5 !py-1 text-xs" type="submit">Restore</button>
-                        </form>
-                      )}
-                    </div>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </section>
+        <KnowledgeBrainManager
+          initialItems={all}
+          clientId={client.id}
+          onUpdateStatus={setKnowledgeStatus}
+          onApproveAll={approveAllCandidates}
+        />
 
         <aside className="space-y-4 xl:sticky xl:top-4 xl:self-start">
           <div className="card border-accent/30 bg-accent/5">
@@ -497,7 +450,9 @@ export default async function ClientDetailPage({
                   <option value="approved">Approved — I verified this</option>
                 </select>
               </div>
-              <button className="btn btn-accent w-full" type="submit">Add to knowledge brain</button>
+              <SubmitButton pendingText="Adding to knowledge brain…" className="btn btn-accent w-full">
+                Add to knowledge brain
+              </SubmitButton>
             </form>
           </div>
 
@@ -555,7 +510,9 @@ export default async function ClientDetailPage({
             </select>
           </div>
           <div className="flex items-end">
-            <button className="btn btn-accent w-full" type="submit">Add to plan</button>
+            <SubmitButton pendingText="Adding to plan…" className="btn btn-accent w-full">
+              Add to plan
+            </SubmitButton>
           </div>
         </form>
 
@@ -639,7 +596,9 @@ export default async function ClientDetailPage({
               <textarea id="c-restricted" name="restrictedClaims" className="input min-h-[70px]" defaultValue={client.restrictedClaims} maxLength={800} />
             </div>
           </div>
-          <button className="btn btn-accent mt-4" type="submit">Save guardrails</button>
+          <SubmitButton pendingText="Saving guardrails…" className="btn btn-accent mt-4">
+            Save guardrails
+          </SubmitButton>
         </form>
 
         <aside className="space-y-4">
