@@ -12,6 +12,7 @@ import { auditDraftForQuality, PLATFORM_GUIDELINES, formatBrainAndMemoryPrompt }
 import { suggestImagePrompts, buildImageSvg, IMAGE_ASPECTS, IMAGE_STYLES } from "../lib/images";
 import { generateCalendarPlan } from "../lib/planner";
 import { PLAN_INR_PRICING, getCashfreeConfig } from "../lib/cashfree";
+import { classifyAgentIntent } from "../lib/agent-engine";
 
 describe("canonicalUrl", () => {
   it("strips tracking params and www", () => {
@@ -420,5 +421,35 @@ describe("cashfree payment gateway configuration and inr pricing", () => {
     expect(config.apiVersion).toBe("2023-08-01");
     expect(config.baseUrl).toContain("api.cashfree.com");
     expect(config.isConfigured).toBe(true);
+  });
+});
+
+describe("agent engine intent classification", () => {
+  it("accurately classifies prompt intents across the 5 core capabilities", () => {
+    // 1. Ingest / Build Brain
+    expect(classifyAgentIntent("Crawl https://saasnext.in and extract knowledge")).toBe("build_brain");
+    expect(classifyAgentIntent("scrape our docs and build brain")).toBe("build_brain");
+    expect(classifyAgentIntent("https://example.com/pricing")).toBe("build_brain");
+
+    // 2. Audit Content & Claims
+    expect(classifyAgentIntent("Audit this draft: Most enterprise SDRs fail due to hallucinations")).toBe("audit_content");
+    expect(classifyAgentIntent("fact check this text against our approved memory")).toBe("audit_content");
+    expect(classifyAgentIntent("verify draft for ungrounded claims")).toBe("audit_content");
+
+    // 3. Brainstorm Angles & Tension
+    expect(classifyAgentIntent("Brainstorm 4 contrarian angles for our enterprise campaign")).toBe("brainstorm");
+    expect(classifyAgentIntent("What are some strong tension map hooks based on our facts?")).toBe("brainstorm");
+
+    // 4. Plan Content
+    expect(classifyAgentIntent("Plan next week's 7-day content schedule across LinkedIn and X")).toBe("plan_content");
+    expect(classifyAgentIntent("generate monthly calendar roadmap")).toBe("plan_content");
+
+    // 5. Draft Content
+    expect(classifyAgentIntent("Draft a LinkedIn post on architecture tradeoffs")).toBe("draft_content");
+    expect(classifyAgentIntent("Write an X thread breaking down our Q3 case study")).toBe("draft_content");
+    expect(classifyAgentIntent("author a 45s reel script with a hook")).toBe("draft_content");
+
+    // 6. Manage Brain
+    expect(classifyAgentIntent("Show all approved facts in our brain")).toBe("manage_brain");
   });
 });

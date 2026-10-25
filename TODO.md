@@ -213,4 +213,36 @@ Eliminate synthetic mock/demo seeds, connect the live OpenRouter AI inference pi
   - Built interactive checkout component (`components/cashfree-checkout-button.tsx`) leveraging official Cashfree Web JS SDK v3.
   - Integrated Cashfree checkout directly on `/settings/plan` and `/pricing` with automatic paid order verification and instant workspace plan activation.
 
+---
+
+## Phase 13: Prompt-Driven Agentic Knowledge OS & Dynamic Artifact Canvas
+- [x] **13.1 Autonomous Agent Engine (`lib/agent-engine.ts`)**
+  - Implemented universal intent classification & prompt dispatcher (`classifyAgentIntent`, `executeAgentPrompt`):
+    - `BUILD_BRAIN`: Ingest URL/text, extract structured facts with OpenRouter, persist to DB as candidate facts.
+    - `MANAGE_BRAIN`: Search facts, filter approved/candidate/archived, update fact body, bulk approve.
+    - `BRAINSTORM`: Generate contrarian angles, audience tension maps, kinetic hooks, and claim anchors.
+    - `AUDIT_CONTENT`: Audit any user draft or pasted text against client's approved facts & restricted claims (0-100% score).
+    - `DRAFT_CONTENT`: Author verified posts (LinkedIn, X threads, Reels, SEO articles) grounded in knowledge facts.
+    - `PLAN_CONTENT`: Generate strategic multi-channel publishing schedule based on approved facts.
+- [x] **13.2 Dynamic Multi-Modal Artifact Canvas (`components/dynamic-artifact-canvas.tsx`)**
+  - Right-pane adaptive artifact container with 5 dedicated interactive tool modes:
+    - `BrainCanvas`: Interactive knowledge cards with status tabs (`Approved`, `Candidates`, `Archived`), 1-click Approve, and Delete.
+    - `BrainstormCanvas`: Tension maps, angle matrix, kinetic hooks, and 1-click "Draft from this angle" actions.
+    - `AuditCanvas`: Visual claim verification score radar, sentence-level citation highlights (✓ Fact, ⚠ Stance, ✕ Hallucination), and violations alert.
+    - `DraftCanvas`: Live draft reader, LinkedIn/X preview, claim ledger tabs, and 1-click copy/schedule.
+    - `PlanCanvas`: Interactive 7-day/30-day publishing calendar with minute-level scheduling.
+- [x] **13.3 Agent Conversational Thought Partner (`components/agent-chat-pane.tsx`)**
+  - Claude-style conversation stream with user badges and Curro Agent messages.
+  - Collapsible agent thinking & reasoning states ("Reading approved facts...", "Crawling target URL...", "Verifying claim citations...").
+  - Contextual quick-starter chips for Ingesting URLs, Brainstorming Angles, Auditing Drafts, and Planning Roadmaps.
+  - Auto-resizing command bar with model selector, knowledge count indicator, format picker, and keyboard submission (`Enter` / `Shift+Enter`).
+- [x] **13.4 Unified Dashboard Workspace Overhaul (`components/prompt-agent-workspace.tsx` & `app/studio/page.tsx`)**
+  - Transformed Curro's core studio into the unified Prompt-Driven Agentic Operating System.
+  - Real-time client switching, dynamic mode switcher pill, and zero-latency state updates.
+- [x] **13.5 Test Suite & Production Hardening**
+  - Added unit tests for agent intent classification across all 5 capabilities in `tests/unit.test.ts`.
+  - Verified TypeScript compilation (`npx tsc --noEmit`) with zero errors.
+  - Verified full test suite (`npm test`): 37/37 tests passing in 429ms.
+  - Verified production build (`next build`): 38/38 routes statically and dynamically optimized.
+
 

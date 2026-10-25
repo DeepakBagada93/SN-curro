@@ -8,7 +8,7 @@ import { CHANNEL_LABELS, knowledgeStats } from "@/lib/clients";
 import { PLATFORM_GUIDELINES } from "@/lib/platform-guidelines";
 import { EmptyState } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
-import { ClaudeStudioHub } from "@/components/claude-studio-hub";
+import { PromptAgentWorkspace } from "@/components/prompt-agent-workspace";
 import type { AssetFormat, ClaimEntry } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -150,36 +150,15 @@ export default async function StudioPage({
         <p className="alert alert-warning max-w-4xl mx-auto">Draft archived.</p>
       )}
 
-      <ClaudeStudioHub
+      <PromptAgentWorkspace
+        client={client}
         clients={db.clients.map((c) => ({
           id: c.id,
           name: c.name,
-          brandColor: c.brandColor,
-          industry: c.industry,
-          summary: c.summary,
-          audience: c.audience,
-          tone: c.tone
+          brandColor: c.brandColor
         }))}
-        activeClient={{
-          id: client.id,
-          name: client.name,
-          brandColor: client.brandColor,
-          industry: client.industry,
-          summary: client.summary,
-          audience: client.audience,
-          tone: client.tone
-        }}
-        approvedKnowledge={approved.map((k) => ({
-          id: k.id,
-          title: k.title,
-          kind: k.kind,
-          body: k.body
-        }))}
-        approvedMemoriesCount={approvedMemory.length}
-        recentAssets={assetsSummary}
-        createAction={createStudioAsset.bind(null, client.id)}
-        modelLabel={modelLabel}
-        planUsage={{ used, limit: limit.generations }}
+        initialKnowledge={knowledge}
+        initialAssets={assets}
       />
     </div>
   );
