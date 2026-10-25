@@ -251,6 +251,7 @@ export function scaffoldStarterBrainFacts(
         audience?: string;
         tone?: string;
         restrictedClaims?: string;
+        website?: string;
       },
   industry?: string,
   summary?: string,

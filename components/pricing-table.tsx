@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { PLAN_CATALOG, PLAN_ORDER } from "@/lib/agency";
+import { CashfreeCheckoutButton } from "./cashfree-checkout-button";
+import type { PlanTier } from "@/lib/types";
 
 const TIER_FEATURES: Record<string, string[]> = {
   solo: [
@@ -182,15 +184,29 @@ export function PricingTable() {
               </div>
 
               {/* Action Button */}
-              <div className="mt-6 pt-4 border-t border-border/40">
-                <a
-                  href="/signup"
-                  className={`btn w-full !text-sm ${
-                    isHighlight ? "btn-accent btn-glow" : "btn-outline"
-                  }`}
-                >
-                  {tier === "enterprise" ? "Contact Team →" : "Start 3-Day Free Trial →"}
-                </a>
+              <div className="mt-6 pt-4 border-t border-border/40 space-y-2">
+                {tier === "enterprise" ? (
+                  <a href="/contact" className="btn btn-outline w-full !text-xs font-semibold !py-2.5">
+                    Contact Enterprise Sales →
+                  </a>
+                ) : (
+                  <>
+                    <CashfreeCheckoutButton
+                      tier={tier as PlanTier}
+                      annual={annual}
+                      label={`Subscribe via Cashfree (${displayPrice}) →`}
+                      className={`btn w-full !text-xs font-semibold !py-2.5 ${
+                        isHighlight ? "btn-accent btn-glow" : "btn-accent"
+                      }`}
+                    />
+                    <a
+                      href="/signup"
+                      className="block text-center text-[11px] text-muted-foreground hover:text-foreground hover:underline"
+                    >
+                      Or start 3-day free trial first
+                    </a>
+                  </>
+                )}
               </div>
             </div>
           );

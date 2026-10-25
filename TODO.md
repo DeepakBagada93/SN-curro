@@ -150,3 +150,67 @@ Eliminate synthetic mock/demo seeds, connect the live OpenRouter AI inference pi
 - [x] **10.4 30-Day Planner & Brief AI Tasks**
   - Verified deterministic draft builder from approved client knowledge only.
   - Verified parallel search / manual brief retrieval with progress feedback.
+
+---
+
+## Phase 11: Claude-Style Chatbot & Artifacts UI/UX Redesign
+- [x] **11.1 Design Tokens & Claude Editorial Theme**
+  - Defined warm, calm Claude-inspired palette (`#FBFBFA` parchment backgrounds, refined borders, Fraunces serif headings, warm terracotta accent).
+  - Modernized global styles with `.claude-card`, `.claude-sidebar`, `.claude-bubble-user`, `.claude-bubble-assistant`, `.claude-artifact-panel`.
+- [x] **11.2 Claude-Style Collapsible Sidebar & Shell (`components/chrome.tsx`)**
+  - Replaced cluttered static sidebar with Claude-inspired collapsible rail (expanded 264px / collapsed 68px with smooth state persistence in `localStorage`).
+  - Added top `+ New Draft` action button and Client Brain switcher with brand color indicators.
+  - Added recent drafts session history grouped chronologically with direct links.
+  - Streamlined primary workspace nav (`Studio`, `Client Brain`, `Planner`, `Calendar`, `Images`, `Analytics`).
+- [x] **11.3 Claude Central Command Hub (`/studio` & `components/claude-studio-hub.tsx`)**
+  - Implemented Claude-style centered greeting (*"What shall we draft for {client.name} today?"*).
+  - Added approved client facts counter pill and anti-fluff shield badge.
+  - Added 4 high-CTR starter prompt cards (LinkedIn Contrarian, X Thread, Kinetic Reel Script, SEO Article).
+  - Added auto-resizing conversational prompt card with format picker and knowledge source selector modal.
+- [x] **11.4 Two-Pane Interactive Chat + Artifacts Workspace (`components/claude-artifact-workspace.tsx` & `/studio/[id]`)**
+  - **Left Pane (Conversational Thought Partner)**: Multi-turn dialogue between user and Curro AI with thinking status indicators, quick refinement pills (*Punchier Hook*, *Executive Tone*, *Cut 30%*).
+  - **Right Pane (Live Interactive Artifact Panel)**: Clean tabbed artifact viewer (`Draft Content`, `Claim Ledger`, `Social Preview`, `Edit Body`).
+  - Traceable Claim Ledger badges (✓ Factual, ⚠ Opinion, ✕ Unsupported) with in-place claim removal.
+  - Action footer: 1-click Copy, Share Review Link, Approve Draft, and direct Calendar scheduling.
+- [x] **11.5 Conversational Intent Router & Agent Action Pipeline**
+  - Wired prompt input directly to `createStudioAsset` with approved client facts.
+  - Connected draft refinement and version saving.
+- [x] **11.6 Polish, Responsive Layout & Build Verification**
+  - Tested mobile navigation with drawer menu.
+  - Verified TypeScript compilation (`npx tsc --noEmit`) clean with zero errors.
+  - Verified full test suite (`vitest run`): 34/34 tests passing in 358ms.
+  - Verified production build (`next build`): 34/34 routes statically and dynamically optimized.
+
+---
+
+## Phase 12: Cashfree Payment Gateway Compliance & Legal Policy Suite
+- [x] **12.1 Contact Us Page (`/contact` & `components/contact-form.tsx`)**
+  - Registered Legal & Operating Address (Moti Palace Compound, Junagadh, Gujarat 362001, India).
+  - Official Support Email (`support@curro.in`), Helpline (`+91 94092 11982`), and operational hours (Mon-Fri 9:00 AM - 6:00 PM IST).
+  - Interactive support inquiry form with confirmation handling.
+- [x] **12.2 Terms & Conditions Page (`/terms`)**
+  - Complete SaaS customer agreement, eligibility, acceptable use, and client data ownership.
+  - Explicit Indian Rupee (INR - ₹) billing terms and 18% GST invoice generation with ITC.
+  - Designates Cashfree Payments India Private Limited as authorized payment gateway partner.
+  - Governing law: Indian Law, Jurisdiction: Courts in Junagadh, Gujarat, India.
+- [x] **12.3 Refunds & Cancellations Policy (`/refunds`)**
+  - Self-serve cancellation instructions directly via Settings.
+  - 7-Day Money-Back Guarantee for first-time subscriptions.
+  - Explicit refund processing timeline (5 to 7 business days credited back to original payment source via Cashfree).
+- [x] **12.4 Privacy Policy (`/privacy`)**
+  - Client data isolation guarantees (zero data training on client facts).
+  - PCI-DSS Level 1 tokenized billing compliance via Cashfree Payments.
+  - Grievance Officer details under Indian Information Technology Act.
+- [x] **12.5 Products, Services & INR Pricing Compliance (`/pricing` & `components/chrome.tsx`)**
+  - Full product catalog with explicit INR pricing (₹999 Solo, ₹2,999 Studio, ₹6,999 Agency, ₹19,999 Enterprise).
+  - Prominent Cashfree trust badge detailing accepted modes: UPI (GPay/PhonePe/Paytm), RuPay, Visa, Mastercard, NetBanking.
+  - Instant digital software delivery terms.
+  - Universal footer navigation links to all compliance policies across marketing and app views.
+- [x] **12.6 Cashfree Live Production Payment Gateway Engine (`lib/cashfree.ts` & APIs)**
+  - Configured live production credentials in `.env.local` (`CASHFREE_APP_ID`, `CASHFREE_SECRET_KEY`, `CASHFREE_BASE_URL`).
+  - Implemented `createCashfreeSubscriptionOrder` and `fetchCashfreeOrder` with live Cashfree API verification (`cf_order_id: 7268563822` test verified).
+  - Implemented secure API routes `/api/cashfree/create-order` and `/api/cashfree/verify`.
+  - Built interactive checkout component (`components/cashfree-checkout-button.tsx`) leveraging official Cashfree Web JS SDK v3.
+  - Integrated Cashfree checkout directly on `/settings/plan` and `/pricing` with automatic paid order verification and instant workspace plan activation.
+
+

@@ -11,6 +11,7 @@ import { extractJson } from "../lib/openrouter";
 import { auditDraftForQuality, PLATFORM_GUIDELINES, formatBrainAndMemoryPrompt } from "../lib/platform-guidelines";
 import { suggestImagePrompts, buildImageSvg, IMAGE_ASPECTS, IMAGE_STYLES } from "../lib/images";
 import { generateCalendarPlan } from "../lib/planner";
+import { PLAN_INR_PRICING, getCashfreeConfig } from "../lib/cashfree";
 
 describe("canonicalUrl", () => {
   it("strips tracking params and www", () => {
@@ -398,5 +399,26 @@ describe("platform guidelines, memory grounding & image studio", () => {
     expect(plan.some((p) => p.channel === "x")).toBe(true);
     expect(plan.some((p) => p.channel === "blog")).toBe(true);
     expect(plan.every((p) => p.notes.includes("approved knowledge"))).toBe(true);
+  });
+});
+
+describe("cashfree payment gateway configuration and inr pricing", () => {
+  it("defines strictly compliant inr pricing for all plans", () => {
+    expect(PLAN_INR_PRICING.solo.monthly).toBe(999);
+    expect(PLAN_INR_PRICING.solo.annualMonthly).toBe(799);
+    expect(PLAN_INR_PRICING.studio.monthly).toBe(2999);
+    expect(PLAN_INR_PRICING.studio.annualMonthly).toBe(2499);
+    expect(PLAN_INR_PRICING.agency.monthly).toBe(6999);
+    expect(PLAN_INR_PRICING.agency.annualMonthly).toBe(5799);
+    expect(PLAN_INR_PRICING.enterprise.monthly).toBe(19999);
+  });
+
+  it("loads cashfree live credentials and config correctly", () => {
+    process.env.CASHFREE_APP_ID = "test_cf_app_id";
+    process.env.CASHFREE_SECRET_KEY = "test_cf_secret";
+    const config = getCashfreeConfig();
+    expect(config.apiVersion).toBe("2023-08-01");
+    expect(config.baseUrl).toContain("api.cashfree.com");
+    expect(config.isConfigured).toBe(true);
   });
 });

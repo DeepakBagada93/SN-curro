@@ -8,6 +8,7 @@ import { CHANNEL_LABELS, knowledgeStats } from "@/lib/clients";
 import { PLATFORM_GUIDELINES } from "@/lib/platform-guidelines";
 import { EmptyState } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
+import { ClaudeStudioHub } from "@/components/claude-studio-hub";
 import type { AssetFormat, ClaimEntry } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -117,34 +118,27 @@ export default async function StudioPage({
   const approvedMemory = db.memoryCards.filter((m) => m.status === "approved");
   const modelLabel = openRouterConfigured() ? "OpenRouter (live)" : "Mock composer (deterministic)";
 
-  return (
-    <div className="space-y-6">
-      <div className="card">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="eyebrow">Content studio</p>
-            <h1 className="h-display mt-1 text-3xl md:text-4xl">Draft from what the client has approved.</h1>
-            <p className="prose-muted mt-1 max-w-2xl text-sm">Every draft keeps a claim ledger. Unsupported claims block approval until you edit or remove them.</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <a href={`/clients/${client.id}`} className="btn btn-outline btn-sm">Knowledge Brain</a>
-            <a href={`/planner?client=${client.id}`} className="btn btn-sm">Planner →</a>
-          </div>
-        </div>
-        <form method="get" className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto_auto]">
-          <select name="client" defaultValue={client.id} className="input" aria-label="Client">
-            {db.clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-          <select name="format" defaultValue={selectedFormat} className="input sm:!w-52" aria-label="Format">
-            {STUDIO_FORMATS.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
-          </select>
-          <button className="btn btn-outline" type="submit">View</button>
-        </form>
-        <p className="mt-2 text-xs text-muted-foreground">Model: {modelLabel} · Generations this month {used}/{limit.generations} · {stats.approved} approved knowledge items · {approvedMemory.length} approved memories</p>
-      </div>
+  const assetsSummary = assets.map((a) => {
+    const v = db.versions.find((ver) => ver.assetId === a.id && ver.version === a.currentVersion);
+    const c = db.claims.filter((clm) => clm.versionId === v?.id);
+    const openUns = c.filter((clm) => clm.kind === "unsupported" && clm.reviewStatus === "open").length;
+    return {
+      id: a.id,
+      title: a.title ?? v?.body.split("\n")[0] ?? "Untitled draft",
+      format: a.format ?? "linkedin_post",
+      platform: a.platform,
+      status: a.status,
+      currentVersion: a.currentVersion,
+      createdAt: a.createdAt,
+      snippet: v?.body.replace(/[#*]/g, "").slice(0, 160),
+      openUnsupported: openUns
+    };
+  });
 
+  return (
+    <div className="space-y-4">
       {searchParams.error && (
-        <p className="alert alert-danger">
+        <p className="alert alert-danger max-w-4xl mx-auto">
           {searchParams.error === "knowledge"
             ? "No approved knowledge for this client. Approve at least one item first."
             : searchParams.error === "limit"
@@ -152,105 +146,41 @@ export default async function StudioPage({
               : "Select a valid client."}
         </p>
       )}
-      {searchParams.message === "deleted" && <p className="alert alert-warning">Draft archived.</p>}
+      {searchParams.message === "deleted" && (
+        <p className="alert alert-warning max-w-4xl mx-auto">Draft archived.</p>
+      )}
 
-      <div className="grid gap-6 xl:grid-cols-[400px_minmax(0,1fr)]">
-        <section className="card xl:sticky xl:top-4 xl:self-start">
-          <p className="eyebrow">New draft</p>
-          <h2 className="h-display mt-1 text-xl">{formatSpec.label}</h2>
-          <p className="prose-muted mt-1 text-xs">{formatSpec.description} · up to {formatSpec.maxChars.toLocaleString()} chars</p>
-
-          <div className="mt-2.5 flex flex-wrap gap-1.5 text-[11px]">
-            <span className="badge badge-accent">🧠 {approved.length} Brain Facts</span>
-            <span className="badge badge-muted">⚡ {approvedMemory.length} Memories</span>
-            <span className="badge badge-muted">🛡️ Anti-AI Fluff Shield</span>
-          </div>
-
-          {platformGuide && (
-            <div className="mt-3 rounded-lg border border-accent/20 bg-accent/5 p-2.5 text-xs text-muted-foreground space-y-1">
-              <p className="font-semibold text-foreground flex items-center justify-between">
-                <span>{platformGuide.name} Rule</span>
-                <span className="font-mono text-[10px] text-accent font-medium">{platformGuide.charRange.optimal}</span>
-              </p>
-              <p className="line-clamp-2"><strong className="text-foreground/90">Hook:</strong> {platformGuide.hookGuide}</p>
-            </div>
-          )}
-
-          {planItem && (
-            <div className="mt-3 rounded-lg border border-accent/30 bg-accent/5 p-2 text-xs">
-              <span className="font-semibold">From planner:</span> {planItem.title} · {planItem.publishDate}
-            </div>
-          )}
-          {approved.length === 0 ? (
-            <p className="alert alert-warning mt-3">Approve knowledge first — drafting from nothing is how invented claims ship.</p>
-          ) : (
-            <form action={createStudioAsset.bind(null, client.id)} className="mt-3 space-y-3">
-              <input type="hidden" name="format" value={selectedFormat} />
-              {planItem && <input type="hidden" name="planItemId" value={planItem.id} />}
-              <div>
-                <label className="label" htmlFor="st-title">Working title <span className="font-normal text-muted-foreground">(optional)</span></label>
-                <input id="st-title" name="title" className="input" defaultValue={planItem?.title ?? ""} maxLength={200} placeholder="Generated from the top knowledge item" />
-              </div>
-              <div>
-                <label className="label" htmlFor="st-brief">Angle / brief</label>
-                <textarea id="st-brief" name="brief" className="input min-h-[80px]" defaultValue={planItem?.notes ?? ""} maxLength={600} placeholder="The specific point of view — one sentence is enough." />
-              </div>
-              <fieldset>
-                <legend className="label">Source knowledge</legend>
-                <p className="mb-2 text-[11px] text-muted-foreground">Leave all unchecked to use every approved item (max 6).</p>
-                <div className="max-h-44 space-y-1 overflow-auto rounded-lg border border-border p-2">
-                  {approved.map((k) => (
-                    <label key={k.id} className="flex items-start gap-2 text-xs">
-                      <input type="checkbox" name="knowledge" value={k.id} className="mt-0.5" />
-                      <span><span className="font-medium">{k.title}</span> <span className="text-muted-foreground">· {k.kind.replace("_", " ")}</span></span>
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-              <SubmitButton
-                pendingText={`Generating ${formatSpec.label.toLowerCase()} with AI…`}
-                className="btn btn-accent w-full"
-              >
-                Generate {formatSpec.label.toLowerCase()}
-              </SubmitButton>
-              <p className="text-[11px] text-muted-foreground">Output lands in review, never published. Unsupported outcomes stay visible until edited.</p>
-            </form>
-          )}
-        </section>
-
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="h-display text-2xl">Drafts</h2>
-            <span className="text-xs text-muted-foreground">{assets.length} total</span>
-          </div>
-          {assets.length === 0 ? (
-            <div className="card">
-              <EmptyState icon="✎" title="No drafts yet." body="Generate the first asset from approved knowledge. The claim ledger and approval gate come free." />
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {assets.map((asset) => {
-                const version = db.versions.find((v) => v.assetId === asset.id && v.version === asset.currentVersion);
-                const claims = db.claims.filter((c) => c.versionId === version?.id);
-                const openUnsupported = claims.filter((c) => c.kind === "unsupported" && c.reviewStatus === "open").length;
-                return (
-                  <a key={asset.id} href={`/studio/${asset.id}`} className="block rounded-xl border border-border bg-card p-3 transition hover:border-accent/50">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="badge badge-muted">{formatLabel(asset.format ?? "linkedin_post")}</span>
-                      <span className={`badge ${badgeForAssetStatus(asset.status)}`}>{asset.status.replace("_", " ")}</span>
-                      <span className="badge badge-muted">{CHANNEL_LABELS[asset.platform]}</span>
-                      {openUnsupported > 0 && <span className="badge badge-danger">{openUnsupported} unsupported</span>}
-                    </div>
-                    <p className="mt-1.5 font-semibold leading-snug">{asset.title ?? version?.body.split("\n")[0] ?? "Untitled draft"}</p>
-                    <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{version?.body.replace(/[#*]/g, "").slice(0, 180)}</p>
-                    <p className="mt-1 text-[11px] text-muted-foreground">v{asset.currentVersion} · {version?.model ?? "mock"} · {new Date(asset.createdAt).toLocaleDateString()}</p>
-                  </a>
-                );
-              })}
-            </div>
-          )}
-        </section>
-      </div>
+      <ClaudeStudioHub
+        clients={db.clients.map((c) => ({
+          id: c.id,
+          name: c.name,
+          brandColor: c.brandColor,
+          industry: c.industry,
+          summary: c.summary,
+          audience: c.audience,
+          tone: c.tone
+        }))}
+        activeClient={{
+          id: client.id,
+          name: client.name,
+          brandColor: client.brandColor,
+          industry: client.industry,
+          summary: client.summary,
+          audience: client.audience,
+          tone: client.tone
+        }}
+        approvedKnowledge={approved.map((k) => ({
+          id: k.id,
+          title: k.title,
+          kind: k.kind,
+          body: k.body
+        }))}
+        approvedMemoriesCount={approvedMemory.length}
+        recentAssets={assetsSummary}
+        createAction={createStudioAsset.bind(null, client.id)}
+        modelLabel={modelLabel}
+        planUsage={{ used, limit: limit.generations }}
+      />
     </div>
   );
 }

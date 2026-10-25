@@ -8,6 +8,7 @@ import { createReviewToken } from "@/lib/review";
 import { formatInTimeZone, zonedTimeToUtc } from "@/lib/time";
 import { CopyButton } from "@/components/copy-button";
 import { SubmitButton } from "@/components/submit-button";
+import { ClaudeArtifactWorkspace } from "@/components/claude-artifact-workspace";
 import type { ClaimEntry, ContentAsset } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -246,32 +247,15 @@ export default async function StudioAssetPage({
   const reviewUrl = searchParams.review ? `${proto}://${host}/review/${searchParams.review}` : null;
   const openUnsupported = claims.filter((c) => c.kind === "unsupported" && c.reviewStatus === "open").length;
 
+  const knowledgeMap: Record<string, { title: string; kind: string }> = {};
+  for (const k of knowledge) {
+    knowledgeMap[k.id] = { title: k.title, kind: k.kind };
+  }
+
+  const allVersions = db.versions.filter((v) => v.assetId === asset.id);
+
   return (
     <div className="space-y-6">
-      <div className="card">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <a href={`/studio?client=${client.id}`} className="text-xs text-muted-foreground hover:text-foreground">← Studio</a>
-              <span className="badge badge-muted">{formatLabel(asset.format)}</span>
-              <span className={`badge ${badgeForAssetStatus(asset.status)}`}>{asset.status.replace("_", " ")}</span>
-              <span className="badge badge-muted">{CHANNEL_LABELS[asset.platform]}</span>
-              {openUnsupported > 0 && <span className="badge badge-danger">{openUnsupported} unsupported</span>}
-            </div>
-            <h1 className="h-display mt-2 max-w-3xl text-2xl md:text-3xl">{asset.title ?? "Untitled draft"}</h1>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {client.name} · v{asset.currentVersion} · {version?.model ?? "mock"} · updated {new Date(asset.updatedAt ?? asset.createdAt).toLocaleString()}
-              {planItem ? ` · planner: ${planItem.title}` : ""}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <CopyButton text={version?.body ?? ""} label="📋 Copy Draft" className="btn btn-accent btn-sm" />
-            <a href={`/clients/${client.id}`} className="btn btn-outline btn-sm">Sources</a>
-            <form action={archiveAsset.bind(null, asset.id)}><button className="btn btn-ghost btn-sm" type="submit" disabled={asset.status === "archived"}>Archive</button></form>
-          </div>
-        </div>
-      </div>
-
       {asset.clientFeedback && asset.status === "rejected" && (
         <p className="alert alert-danger"><span className="font-semibold">Client feedback:</span> {asset.clientFeedback}</p>
       )}
@@ -294,170 +278,119 @@ export default async function StudioAssetPage({
       {searchParams.message === "unchanged" && <p className="alert alert-warning">No changes — version not created.</p>}
       {searchParams.message === "image" && <p className="alert alert-warning">Image attached. Alt text saved with it.</p>}
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
-        <div className="space-y-6">
-          <section className="card">
-            <div className="flex items-center justify-between">
-              <h2 className="h-display text-xl">Draft</h2>
-              <span className="text-xs text-muted-foreground">{version?.body.length ?? 0} chars · {formatSpec?.maxChars.toLocaleString()} max</span>
+      {/* Claude Interactive Chat + Artifacts Workspace */}
+      <ClaudeArtifactWorkspace
+        asset={{
+          id: asset.id,
+          title: asset.title,
+          format: asset.format,
+          platform: asset.platform,
+          status: asset.status,
+          currentVersion: asset.currentVersion,
+          createdAt: asset.createdAt,
+          approvedAt: asset.approvedAt,
+          scheduledAt: asset.scheduledAt,
+          imageId: asset.imageId,
+          imageAlt: asset.imageAlt
+        }}
+        client={{
+          id: client.id,
+          name: client.name,
+          brandColor: client.brandColor,
+          timezone: client.timezone
+        }}
+        version={version ? {
+          id: version.id,
+          version: version.version,
+          body: version.body,
+          model: version.model,
+          createdAt: version.createdAt
+        } : undefined}
+        claims={claims.map((c) => ({
+          id: c.id,
+          claim: c.claim,
+          kind: c.kind,
+          sourceIds: c.sourceIds,
+          reviewStatus: c.reviewStatus,
+          reviewNote: c.reviewNote
+        }))}
+        allVersions={allVersions.map((v) => ({
+          id: v.id,
+          version: v.version,
+          body: v.body,
+          model: v.model,
+          createdAt: v.createdAt
+        }))}
+        knowledgeMap={knowledgeMap}
+        saveVersionAction={saveVersion.bind(null, asset.id)}
+        approveAction={approveAsset.bind(null, asset.id)}
+        rejectAction={rejectAsset.bind(null, asset.id)}
+        removeClaimAction={removeClaim.bind(null, asset.id)}
+        scheduleAction={scheduleAsset.bind(null, asset.id)}
+        makeReviewLinkAction={makeReviewLink.bind(null, asset.id)}
+        reviewUrl={reviewUrl}
+        canApprove={check}
+      />
+
+      {/* Production Scheduling & Asset Management Row */}
+      <div className="grid gap-6 md:grid-cols-2 pt-2 border-t border-border">
+        {/* Post Scheduling */}
+        <section className="card">
+          <p className="eyebrow">Publishing Schedule</p>
+          {post && post.status !== "cancelled" ? (
+            <div className="mt-1 text-sm">
+              <p><span className={`badge ${post.status === "published" ? "badge-success" : post.status === "failed" ? "badge-danger" : "badge-warning"}`}>{post.status}</span></p>
+              <p className="mt-2 font-medium">{formatInTimeZone(post.scheduledAt, post.timezone, { dateStyle: "full" })}</p>
+              <p className="text-xs text-muted-foreground">{formatInTimeZone(post.scheduledAt, post.timezone)} · {post.timezone}</p>
+              {post.failureReason && <p className="mt-1 text-xs text-destructive">{post.failureReason}</p>}
+              <a className="btn btn-outline btn-sm mt-3" href={`/calendar?client=${client.id}`}>Open calendar →</a>
             </div>
-            {locked ? (
-              <pre className="mt-3 whitespace-pre-wrap break-words rounded-xl border border-border bg-muted/40 p-4 font-sans text-sm leading-relaxed">{version?.body}</pre>
-            ) : (
-              <form action={saveVersion.bind(null, asset.id)} className="mt-3 space-y-2">
-                <label className="sr-only" htmlFor="body">Draft body</label>
-                <textarea id="body" name="body" defaultValue={version?.body ?? ""} className="input min-h-[360px] font-sans leading-relaxed" required minLength={40} maxLength={12000} />
-                <div className="flex flex-wrap items-center gap-2">
-                  <button className="btn btn-accent" type="submit">Save as v{asset.currentVersion + 1}</button>
-                  <span className="text-[11px] text-muted-foreground">Saving creates a version; it never auto-approves.</span>
-                </div>
-              </form>
-            )}
-          </section>
+          ) : asset.status === "approved" ? (
+            <form action={scheduleAsset.bind(null, asset.id)} className="mt-2 space-y-2">
+              <p className="text-xs text-muted-foreground">Sends as {account?.handle ?? client.name} in {client.timezone}.</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div><label className="label" htmlFor="sch-date">Date</label><input id="sch-date" name="date" type="date" className="input" required defaultValue={planItem?.publishDate ?? new Date().toISOString().slice(0, 10)} /></div>
+                <div><label className="label" htmlFor="sch-time">Time</label><input id="sch-time" name="time" type="time" className="input" required defaultValue="09:00" /></div>
+              </div>
+              <button className="btn btn-accent w-full" type="submit">Schedule to Calendar</button>
+            </form>
+          ) : (
+            <p className="mt-2 text-xs text-muted-foreground">Approve the draft first to schedule. Scheduling is gated by the Claim Ledger.</p>
+          )}
+        </section>
 
-          <section className="card">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="h-display text-xl">Claim ledger</h2>
-              <div className="flex gap-1 text-[11px] text-muted-foreground"><span>{claims.length} claims</span><span>·</span><span>{claims.filter((c) => c.kind === "factual").length} cited</span><span>·</span><span>{openUnsupported} open</span></div>
+        {/* Visual Media & Archive */}
+        <section className="card">
+          <div className="flex items-center justify-between">
+            <p className="eyebrow">Visual Asset</p>
+            <form action={archiveAsset.bind(null, asset.id)}>
+              <button className="text-xs text-destructive hover:underline" type="submit" disabled={asset.status === "archived"}>
+                Archive Draft
+              </button>
+            </form>
+          </div>
+          {attachedImage ? (
+            <div className="mt-2 space-y-2">
+              <img src={`/api/images/${attachedImage.id}/file`} alt={asset.imageAlt ?? attachedImage.title ?? attachedImage.prompt} className="w-full rounded-lg border border-border max-h-48 object-cover" />
+              <p className="text-[11px] text-muted-foreground">Alt text: {asset.imageAlt}</p>
             </div>
-            <div className="mt-3 space-y-2">
-              {claims.map((claim) => {
-                const removed = claim.reviewStatus === "removed";
-                return (
-                  <div key={claim.id} className={`rounded-lg border border-border p-3 ${removed ? "opacity-50" : ""}`}>
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className={`badge ${KIND_BADGE[claim.kind]}`}>{claim.kind}</span>
-                      {removed && <span className="badge badge-muted">removed</span>}
-                      <span className="text-[11px] text-muted-foreground">{claim.sourceIds.length} source{claim.sourceIds.length === 1 ? "" : "s"}</span>
-                    </div>
-                    <p className={`mt-1 text-sm ${removed ? "line-through" : ""}`}>{claim.claim}</p>
-                    {claim.reviewNote && <p className="mt-1 text-xs text-muted-foreground">{claim.reviewNote}</p>}
-                    {claim.sourceIds.length > 0 && (
-                      <p className="mt-1 text-[11px] text-muted-foreground">
-                        {claim.sourceIds.map((id) => {
-                          const k = knowledge.find((x) => x.id === id);
-                          return k ? <span key={id} className="mr-2">✓ {k.title} · {KNOWLEDGE_KIND_LABELS[k.kind]}</span> : null;
-                        })}
-                      </p>
-                    )}
-                    {!locked && !removed && (
-                      <form action={removeClaim.bind(null, asset.id, claim.id)} className="mt-2">
-                        <button className="btn btn-outline btn-sm !px-2 !py-0.5 text-[11px]" type="submit">Remove claim</button>
-                      </form>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            <p className="mt-3 text-[11px] text-muted-foreground">Removing a claim only removes it from the ledger — edit the body so the sentence is gone too.</p>
-          </section>
-
-          <section className="card">
-            <h2 className="h-display text-xl">Version history</h2>
-            <div className="mt-3 divide-y divide-border">
-              {db.versions.filter((v) => v.assetId === asset.id).sort((a, b) => b.version - a.version).map((v) => (
-                <div key={v.id} className="flex items-center justify-between gap-3 py-2 text-xs">
-                  <span><span className="font-semibold">v{v.version}</span> · {v.model} · {new Date(v.createdAt).toLocaleString()}</span>
-                  <span className="text-muted-foreground">{v.body.length} chars</span>
-                </div>
-              ))}
-            </div>
-          </section>
-        </div>
-
-        <aside className="space-y-4 xl:sticky xl:top-4 xl:self-start">
-          <section className="card">
-            <p className="eyebrow">Approval gate</p>
-            <h2 className="h-display mt-1 text-lg">{asset.status === "approved" ? "Approved" : asset.status === "scheduled" ? "Scheduled" : check.ok ? "Ready to approve" : "Blocked"}</h2>
-            {check.ok ? (
-              <p className="prose-muted mt-1 text-xs">Every factual claim cites approved knowledge, and no unsupported claims are open.</p>
-            ) : (
-              <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
-                {check.blockers.map((b) => <li key={b.code}>• {b.message}</li>)}
-              </ul>
-            )}
-            {!locked && (
-              <div className="mt-3 flex flex-wrap gap-2">
-                <form action={approveAsset.bind(null, asset.id)}>
-                  <SubmitButton pendingText="Approving draft…" className="btn btn-accent btn-sm" disabled={!check.ok}>
-                    Approve draft
-                  </SubmitButton>
-                </form>
-                <form action={rejectAsset.bind(null, asset.id)}><button className="btn btn-outline btn-sm" type="submit">Reject</button></form>
+          ) : (
+            <p className="mt-1 text-xs text-muted-foreground">No image attached.</p>
+          )}
+          {!locked && (
+            <form action={attachImage.bind(null, asset.id)} className="mt-3 space-y-2">
+              <select name="imageId" className="input text-xs" defaultValue={asset.imageId ?? ""} aria-label="Image">
+                <option value="">No image</option>
+                {images.map((i) => <option key={i.id} value={i.id}>{i.title ?? i.prompt}</option>)}
+              </select>
+              <input name="imageAlt" className="input text-xs" defaultValue={asset.imageAlt ?? ""} maxLength={220} placeholder="Alt text (for accessibility)" aria-label="Alt text" />
+              <div className="flex gap-2">
+                <button className="btn btn-outline btn-sm" type="submit">Attach Image</button>
+                <a className="btn btn-ghost btn-sm" href={`/images?client=${client.id}`}>Create Image →</a>
               </div>
-            )}
-            {locked && asset.status !== "scheduled" && (
-              <form action={makeReviewLink.bind(null, asset.id)} className="mt-3">
-                <button className="btn btn-outline btn-sm" type="submit">Create client review link</button>
-              </form>
-            )}
-            {reviewUrl && (
-              <div className="mt-2 rounded-lg border border-accent/30 bg-accent/5 p-2 text-xs">
-                <p className="font-semibold">Share this with the client (7 days):</p>
-                <a className="mt-1 block break-all text-accent underline" href={reviewUrl}>{reviewUrl}</a>
-              </div>
-            )}
-          </section>
-
-          <section className="card">
-            <p className="eyebrow">Scheduling</p>
-            {post && post.status !== "cancelled" ? (
-              <div className="mt-1 text-sm">
-                <p><span className={`badge ${post.status === "published" ? "badge-success" : post.status === "failed" ? "badge-danger" : "badge-warning"}`}>{post.status}</span></p>
-                <p className="mt-2">{formatInTimeZone(post.scheduledAt, post.timezone, { dateStyle: "full" })}</p>
-                <p className="text-xs text-muted-foreground">{formatInTimeZone(post.scheduledAt, post.timezone)} · {post.timezone}</p>
-                {post.failureReason && <p className="mt-1 text-xs text-destructive">{post.failureReason}</p>}
-                <a className="btn btn-outline btn-sm mt-2" href={`/calendar?client=${client.id}`}>Open calendar →</a>
-              </div>
-            ) : asset.status === "approved" ? (
-              <form action={scheduleAsset.bind(null, asset.id)} className="mt-2 space-y-2">
-                <p className="text-xs text-muted-foreground">Sends as {account?.handle ?? client.name} in {client.timezone}. Approval is recorded.</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <div><label className="label" htmlFor="sch-date">Date</label><input id="sch-date" name="date" type="date" className="input" required defaultValue={planItem?.publishDate ?? new Date().toISOString().slice(0, 10)} /></div>
-                  <div><label className="label" htmlFor="sch-time">Time</label><input id="sch-time" name="time" type="time" className="input" required defaultValue="09:00" /></div>
-                </div>
-                <button className="btn btn-accent w-full" type="submit">Schedule post</button>
-              </form>
-            ) : (
-              <p className="mt-2 text-xs text-muted-foreground">Approve the draft first. Scheduling never bypasses the claim ledger.</p>
-            )}
-          </section>
-
-          <section className="card">
-            <p className="eyebrow">Image</p>
-            {attachedImage ? (
-              <div className="mt-2">
-                <img src={`/api/images/${attachedImage.id}/file`} alt={asset.imageAlt ?? attachedImage.title ?? attachedImage.prompt} className="w-full rounded-lg border border-border" />
-                <p className="mt-1 text-[11px] text-muted-foreground">Alt: {asset.imageAlt}</p>
-              </div>
-            ) : (
-              <p className="mt-1 text-xs text-muted-foreground">No image attached. Approval does not require one; scheduling requires alt text if present.</p>
-            )}
-            {!locked && (
-              <form action={attachImage.bind(null, asset.id)} className="mt-2 space-y-2">
-                <select name="imageId" className="input" defaultValue={asset.imageId ?? ""} aria-label="Image">
-                  <option value="">No image</option>
-                  {images.map((i) => <option key={i.id} value={i.id}>{i.title ?? i.prompt}</option>)}
-                </select>
-                <input name="imageAlt" className="input" defaultValue={asset.imageAlt ?? ""} maxLength={220} placeholder="Alt text (required when attached)" aria-label="Alt text" />
-                <div className="flex gap-2">
-                  <button className="btn btn-outline btn-sm" type="submit">Attach</button>
-                  <a className="btn btn-ghost btn-sm" href={`/images?client=${client.id}`}>New image</a>
-                </div>
-              </form>
-            )}
-          </section>
-
-          <section className="card">
-            <p className="eyebrow">Sources used</p>
-            <ul className="mt-1 space-y-1 text-xs">
-              {usedKnowledge.length === 0 && <li className="text-muted-foreground">None recorded.</li>}
-              {usedKnowledge.map((k) => k && (
-                <li key={k.id}><span className="font-medium">{k.title}</span> <span className="text-muted-foreground">· {KNOWLEDGE_KIND_LABELS[k.kind]}</span></li>
-              ))}
-            </ul>
-          </section>
-        </aside>
+            </form>
+          )}
+        </section>
       </div>
     </div>
   );

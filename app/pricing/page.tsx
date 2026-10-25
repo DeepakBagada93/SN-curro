@@ -40,6 +40,60 @@ export default function Pricing() {
 
       <section className="container-x max-w-6xl pb-16">
         <PricingTable />
+
+        {/* Cashfree Payment Gateway & Compliance Banner */}
+        <div className="mt-8 rounded-2xl border border-border bg-card p-6 shadow-sm space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">🔒</span>
+              <div>
+                <p className="font-semibold text-sm text-foreground">
+                  Secured by Cashfree Payments India
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  PCI-DSS Level 1 compliant gateway · 256-bit bank-grade encryption
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-muted-foreground">
+              <span className="rounded-md border border-border bg-muted/60 px-2 py-1">UPI (GPay / PhonePe / Paytm)</span>
+              <span className="rounded-md border border-border bg-muted/60 px-2 py-1">RuPay Cards</span>
+              <span className="rounded-md border border-border bg-muted/60 px-2 py-1">Visa / Mastercard</span>
+              <span className="rounded-md border border-border bg-muted/60 px-2 py-1">NetBanking (50+ Banks)</span>
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-3 text-xs">
+            <div>
+              <p className="font-semibold text-foreground mb-1">Billing Currency (INR - ₹)</p>
+              <p className="text-muted-foreground leading-relaxed">
+                All subscriptions are billed strictly in <strong>Indian Rupees (INR)</strong> with transparent pricing. Zero currency conversion fees.
+              </p>
+            </div>
+            <div>
+              <p className="font-semibold text-foreground mb-1">Instant Digital Delivery</p>
+              <p className="text-muted-foreground leading-relaxed">
+                Software access and token limits are instantly unlocked upon successful Cashfree transaction confirmation.
+              </p>
+            </div>
+            <div>
+              <p className="font-semibold text-foreground mb-1">7-Day Refund Policy</p>
+              <p className="text-muted-foreground leading-relaxed">
+                100% money-back guarantee within 7 days. Refunds processed to original payment method via Cashfree within 5-7 business days.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-border/80 text-[11px] text-muted-foreground">
+            <span>GST invoices generated automatically with full ITC compliance.</span>
+            <div className="flex items-center gap-4">
+              <a href="/terms" className="hover:text-foreground underline">Terms & Conditions</a>
+              <a href="/refunds" className="hover:text-foreground underline">Refund Policy</a>
+              <a href="/privacy" className="hover:text-foreground underline">Privacy Policy</a>
+              <a href="/contact" className="hover:text-foreground underline">Billing Support</a>
+            </div>
+          </div>
+        </div>
       </section>
 
       <section className="container-x max-w-5xl py-16">
