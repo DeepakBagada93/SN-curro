@@ -8,6 +8,9 @@ import { createReviewToken, verifyReviewToken } from "../lib/review";
 import { generateStudioDraft } from "../lib/studio";
 import { scrapeUrlForKnowledge, scaffoldStarterBrainFacts, extractFactsFromText } from "../lib/crawler";
 import { extractJson } from "../lib/openrouter";
+import { auditDraftForQuality, PLATFORM_GUIDELINES, formatBrainAndMemoryPrompt } from "../lib/platform-guidelines";
+import { suggestImagePrompts, buildImageSvg, IMAGE_ASPECTS, IMAGE_STYLES } from "../lib/images";
+import { generateCalendarPlan } from "../lib/planner";
 
 describe("canonicalUrl", () => {
   it("strips tracking params and www", () => {
@@ -250,5 +253,150 @@ We adhere to strict SOC2 Type II and HIPAA compliance standards across all stora
     expect(extracted[0]).toHaveProperty("body");
     expect(extracted[0]).toHaveProperty("kind");
     expect(extracted[0]).toHaveProperty("tags");
+  });
+});
+
+describe("platform guidelines, memory grounding & image studio", () => {
+  const client = {
+    id: "c1",
+    workspaceId: "w1",
+    name: "Acme Cloud",
+    audience: "DevOps engineers",
+    tone: "Concise, engineering-first",
+    summary: "Reliable Kubernetes management platform",
+    restrictedClaims: "guaranteed 100% uptime, zero downtime",
+    website: "https://acmecloud.io",
+    brandColor: "#0ea5e9"
+  } as never;
+
+  const knowledge = [
+    {
+      id: "k1",
+      workspaceId: "w1",
+      clientId: "c1",
+      kind: "brand_fact",
+      title: "Failover Speed",
+      body: "Automated failover in under 30 seconds for mission-critical clusters.",
+      status: "approved",
+      tags: ["failover", "infrastructure"],
+      sourceUrl: "https://acmecloud.io/specs"
+    },
+    {
+      id: "k2",
+      workspaceId: "w1",
+      clientId: "c1",
+      kind: "audience",
+      title: "Target Decision Maker",
+      body: "Heads of Platform Engineering at series B+ tech startups.",
+      status: "approved",
+      tags: ["icp"],
+      sourceUrl: null
+    }
+  ] as never;
+
+  const memory = [
+    {
+      id: "m1",
+      workspaceId: "w1",
+      kind: "opinion",
+      body: "Never optimize for vanity clicks over engineering credibility.",
+      status: "approved",
+      provenance: "Founder entry",
+      createdAt: "2026-10-25T00:00:00Z",
+      approvedAt: "2026-10-25T00:00:00Z"
+    },
+    {
+      id: "m2",
+      workspaceId: "w1",
+      kind: "voice_example",
+      body: "Direct, plain sentences. Show exact metrics rather than adjectives.",
+      status: "approved",
+      provenance: "Founder entry",
+      createdAt: "2026-10-25T00:00:00Z",
+      approvedAt: "2026-10-25T00:00:00Z"
+    }
+  ] as never;
+
+  it("audits drafts for synthetic AI phrases and restricted claims", () => {
+    const badDraft = "In today's fast-paced world, this is a game-changer that offers guaranteed 100% uptime.";
+    const audit = auditDraftForQuality(badDraft, client, "linkedin_post");
+    expect(audit.qualityFlags.some((f) => f.includes("anti-ai-pattern"))).toBe(true);
+    expect(audit.qualityFlags.some((f) => f.includes("restricted-claim-violation"))).toBe(true);
+    expect(audit.warnings.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("formats brain and memory prompt with verified client truths and founder opinions", () => {
+    const prompt = formatBrainAndMemoryPrompt(client, knowledge, memory);
+    expect(prompt).toContain("CLIENT KNOWLEDGE BRAIN");
+    expect(prompt).toContain("Acme Cloud");
+    expect(prompt).toContain("Automated failover in under 30 seconds");
+    expect(prompt).toContain("WORKSPACE & FOUNDER MEMORY");
+    expect(prompt).toContain("Never optimize for vanity clicks over engineering credibility");
+  });
+
+  it("generates platform-ready image prompt suggestions from brain and memory", () => {
+    const suggestions = suggestImagePrompts(client, knowledge, memory);
+    expect(suggestions.length).toBeGreaterThanOrEqual(3);
+    expect(suggestions.some((s) => s.style === "stat_callout" || s.style === "framework")).toBe(true);
+    expect(suggestions.some((s) => s.style === "minimal_quote")).toBe(true);
+    expect(suggestions.some((s) => s.aspect === "story")).toBe(true);
+  });
+
+  it("renders distinct SVG layouts across styles and aspect ratios", () => {
+    const editorialSvg = buildImageSvg({
+      prompt: "Under 30s Multi-Cloud Failover",
+      palette: ["#0ea5e9", "#f0f9ff", "#bae6fd", "#0f172a"],
+      aspect: "landscape",
+      brandName: "Acme Cloud",
+      style: "editorial"
+    });
+    expect(editorialSvg).toContain('width="1200"');
+    expect(editorialSvg).toContain('height="628"');
+    expect(editorialSvg).toContain("ACME CLOUD");
+
+    const statSvg = buildImageSvg({
+      prompt: "30s Automated Failover",
+      palette: ["#0ea5e9", "#f0f9ff", "#bae6fd", "#0f172a"],
+      aspect: "square",
+      brandName: "Acme Cloud",
+      style: "stat_callout"
+    });
+    expect(statSvg).toContain("30s");
+    expect(statSvg).toContain("VERIFIED EVIDENCE");
+
+    const frameworkSvg = buildImageSvg({
+      prompt: "Cloud Architecture",
+      palette: ["#0ea5e9", "#f0f9ff", "#bae6fd", "#0f172a"],
+      aspect: "portrait",
+      brandName: "Acme Cloud",
+      style: "framework"
+    });
+    expect(frameworkSvg).toContain("01. INPUT");
+    expect(frameworkSvg).toContain("02. EXECUTE");
+    expect(frameworkSvg).toContain("03. VERIFY");
+
+    const quoteSvg = buildImageSvg({
+      prompt: "Never optimize for vanity clicks",
+      palette: ["#0ea5e9", "#f0f9ff", "#bae6fd", "#0f172a"],
+      aspect: "portrait",
+      brandName: "Acme Cloud",
+      style: "minimal_quote"
+    });
+    expect(quoteSvg).toContain("EXECUTIVE MEMORY");
+  });
+
+  it("generates intelligent calendar plan grounded in brain and memory", async () => {
+    const plan = await generateCalendarPlan({
+      client,
+      knowledge,
+      memory,
+      month: "2026-11"
+    });
+    expect(plan.length).toBeGreaterThanOrEqual(8);
+    expect(plan.every((p) => p.publishDate.startsWith("2026-11"))).toBe(true);
+    expect(plan.some((p) => p.channel === "linkedin")).toBe(true);
+    expect(plan.some((p) => p.channel === "x")).toBe(true);
+    expect(plan.some((p) => p.channel === "blog")).toBe(true);
+    expect(plan.every((p) => p.notes.includes("approved knowledge"))).toBe(true);
   });
 });

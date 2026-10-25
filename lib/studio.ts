@@ -1,5 +1,6 @@
-import type { AssetFormat, ClaimKind, Client, KnowledgeItem } from "./types";
+import type { AssetFormat, ClaimKind, Client, KnowledgeItem, MemoryCard } from "./types";
 import { formatChannel, formatLabel } from "./agency";
+import { auditDraftForQuality } from "./platform-guidelines";
 
 export interface GeneratedClaim {
   text: string;
@@ -27,8 +28,10 @@ function hashtags(items: KnowledgeItem[]): string {
   return tags.map((t) => `#${t.replace(/[^a-zA-Z0-9]/g, "")}`).join(" ");
 }
 
-function opinionLine(client: Client, brief: string): string {
+function opinionLine(client: Client, brief: string, memory?: MemoryCard[]): string {
   if (brief.trim()) return brief.trim();
+  const memOpinion = memory?.find((m) => m.status === "approved" && m.kind === "opinion")?.body;
+  if (memOpinion?.trim()) return memOpinion.trim();
   if (client.summary.trim()) return client.summary.trim();
   return `Our view: the decision is easier when the format fits the life around it.`;
 }
@@ -36,11 +39,12 @@ function opinionLine(client: Client, brief: string): string {
 export function generateStudioDraft(input: {
   client: Client;
   knowledge: KnowledgeItem[];
+  memory?: MemoryCard[];
   format: AssetFormat;
   title?: string;
   brief?: string;
 }): GeneratedStudioDraft {
-  const { client, knowledge, format } = input;
+  const { client, knowledge, memory, format } = input;
   const brief = (input.brief ?? "").slice(0, 600);
   const pick = knowledge.slice(0, 3);
   if (pick.length === 0) throw new Error("At least one approved knowledge item is required.");
@@ -49,7 +53,7 @@ export function generateStudioDraft(input: {
   const title = (input.title?.trim() || `${pick[0].title} — ${label}`).slice(0, 200);
   const facts = pick.map((k) => firstSentence(k.body));
   const sourceLines = pick.map((k) => `${k.title}${k.sourceUrl ? ` — ${k.sourceUrl}` : ""}`);
-  const view = opinionLine(client, brief);
+  const view = opinionLine(client, brief, memory);
 
   const claims: GeneratedClaim[] = pick.map((k, i) => ({
     text: facts[i],
@@ -193,6 +197,11 @@ export function generateStudioDraft(input: {
   const qualityFlags: string[] = [];
   if (brief.length > 0 && brief.length < 20) qualityFlags.push("brief-too-short");
   if (pick.some((k) => k.status !== "approved")) qualityFlags.push("unapproved-knowledge");
+
+  const qualityAudit = auditDraftForQuality(body, client, format);
+  for (const flag of qualityAudit.qualityFlags) {
+    if (!qualityFlags.includes(flag)) qualityFlags.push(flag);
+  }
 
   return {
     title,

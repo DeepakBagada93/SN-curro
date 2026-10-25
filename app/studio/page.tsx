@@ -5,6 +5,7 @@ import { openRouterConfigured } from "@/lib/openrouter";
 import { generateStudioAsset } from "@/lib/studio-provider";
 import { PLAN_CATALOG, STUDIO_FORMATS, badgeForAssetStatus, formatChannel, formatForChannel, formatLabel, generationsUsed, planLimit } from "@/lib/agency";
 import { CHANNEL_LABELS, knowledgeStats } from "@/lib/clients";
+import { PLATFORM_GUIDELINES } from "@/lib/platform-guidelines";
 import { EmptyState } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
 import type { AssetFormat, ClaimEntry } from "@/lib/types";
@@ -33,7 +34,8 @@ async function createStudioAsset(clientId: string, formData: FormData) {
   const title = String(formData.get("title") ?? "").trim() || planItem?.title || undefined;
   const brief = String(formData.get("brief") ?? "").trim() || planItem?.notes || planItem?.title || undefined;
 
-  const { draft, model } = await generateStudioAsset({ client, knowledge, format, title, brief });
+  const memory = db.memoryCards.filter((m) => m.status === "approved");
+  const { draft, model } = await generateStudioAsset({ client, knowledge, memory, format, title, brief });
   const t = nowIso();
   const assetId = uid("asset");
   const versionId = uid("ver");
@@ -111,6 +113,8 @@ export default async function StudioPage({
   const limit = PLAN_CATALOG[db.planTier];
   const used = generationsUsed(db.assets);
   const formatSpec = STUDIO_FORMATS.find((f) => f.id === selectedFormat)!;
+  const platformGuide = PLATFORM_GUIDELINES[selectedFormat];
+  const approvedMemory = db.memoryCards.filter((m) => m.status === "approved");
   const modelLabel = openRouterConfigured() ? "OpenRouter (live)" : "Mock composer (deterministic)";
 
   return (
@@ -136,7 +140,7 @@ export default async function StudioPage({
           </select>
           <button className="btn btn-outline" type="submit">View</button>
         </form>
-        <p className="mt-2 text-xs text-muted-foreground">Model: {modelLabel} · Generations this month {used}/{limit.generations} · {stats.approved} approved knowledge items</p>
+        <p className="mt-2 text-xs text-muted-foreground">Model: {modelLabel} · Generations this month {used}/{limit.generations} · {stats.approved} approved knowledge items · {approvedMemory.length} approved memories</p>
       </div>
 
       {searchParams.error && (
@@ -155,6 +159,23 @@ export default async function StudioPage({
           <p className="eyebrow">New draft</p>
           <h2 className="h-display mt-1 text-xl">{formatSpec.label}</h2>
           <p className="prose-muted mt-1 text-xs">{formatSpec.description} · up to {formatSpec.maxChars.toLocaleString()} chars</p>
+
+          <div className="mt-2.5 flex flex-wrap gap-1.5 text-[11px]">
+            <span className="badge badge-accent">🧠 {approved.length} Brain Facts</span>
+            <span className="badge badge-muted">⚡ {approvedMemory.length} Memories</span>
+            <span className="badge badge-muted">🛡️ Anti-AI Fluff Shield</span>
+          </div>
+
+          {platformGuide && (
+            <div className="mt-3 rounded-lg border border-accent/20 bg-accent/5 p-2.5 text-xs text-muted-foreground space-y-1">
+              <p className="font-semibold text-foreground flex items-center justify-between">
+                <span>{platformGuide.name} Rule</span>
+                <span className="font-mono text-[10px] text-accent font-medium">{platformGuide.charRange.optimal}</span>
+              </p>
+              <p className="line-clamp-2"><strong className="text-foreground/90">Hook:</strong> {platformGuide.hookGuide}</p>
+            </div>
+          )}
+
           {planItem && (
             <div className="mt-3 rounded-lg border border-accent/30 bg-accent/5 p-2 text-xs">
               <span className="font-semibold">From planner:</span> {planItem.title} · {planItem.publishDate}

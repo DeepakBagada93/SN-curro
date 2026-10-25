@@ -3,7 +3,15 @@ import { revalidatePath } from "next/cache";
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import { loadDB, saveDB, audit, uid, nowIso } from "@/lib/store";
-import { IMAGE_ASPECTS, IMAGE_COST_USD, buildImageSvg, buildPalette } from "@/lib/images";
+import {
+  IMAGE_ASPECTS,
+  IMAGE_STYLES,
+  IMAGE_COST_USD,
+  buildImageSvg,
+  buildPalette,
+  suggestImagePrompts,
+  type ImageStyleKey
+} from "@/lib/images";
 import { imagesUsed, planLimit, PLAN_CATALOG } from "@/lib/agency";
 import { EmptyState } from "@/components/ui";
 
@@ -21,13 +29,14 @@ async function generateImage(clientId: string, formData: FormData) {
   const prompt = String(formData.get("prompt") ?? "").trim().slice(0, 400);
   const title = String(formData.get("title") ?? "").trim().slice(0, 140);
   const aspect = String(formData.get("aspect") ?? "square");
+  const style = (String(formData.get("style") ?? "editorial")) as ImageStyleKey;
   if (prompt.length < 6) redirect(`/images?client=${clientId}&error=prompt`);
 
   const assetId = String(formData.get("assetId") ?? "");
   const asset = db.assets.find((a) => a.id === assetId && a.clientId === clientId);
   const id = uid("img");
   const palette = buildPalette(prompt + client.name, client.brandColor);
-  const svg = buildImageSvg({ prompt, palette, aspect, brandName: client.name });
+  const svg = buildImageSvg({ prompt, palette, aspect, brandName: client.name, style });
   const dir = path.join(process.cwd(), "data", "images");
   await mkdir(dir, { recursive: true });
   await writeFile(path.join(dir, `${id}.svg`), svg, "utf8");
@@ -72,7 +81,15 @@ async function generateImage(clientId: string, formData: FormData) {
 export default async function ImagesPage({
   searchParams
 }: {
-  searchParams: { client?: string; error?: string; message?: string };
+  searchParams: {
+    client?: string;
+    error?: string;
+    message?: string;
+    prompt?: string;
+    title?: string;
+    aspect?: string;
+    style?: string;
+  };
 }) {
   const db = await loadDB();
   if (db.clients.length === 0) {
@@ -88,6 +105,15 @@ export default async function ImagesPage({
   const limit = PLAN_CATALOG[db.planTier];
   const used = imagesUsed(db.images);
 
+  const approvedK = db.knowledgeItems.filter((k) => k.clientId === client.id && k.status === "approved");
+  const approvedM = db.memoryCards.filter((m) => m.status === "approved");
+  const suggestions = suggestImagePrompts(client, db.knowledgeItems, approvedM);
+
+  const defaultPrompt = searchParams.prompt ?? "";
+  const defaultTitle = searchParams.title ?? "";
+  const defaultAspect = searchParams.aspect ?? "square";
+  const defaultStyle = (searchParams.style as ImageStyleKey) ?? "editorial";
+
   return (
     <div className="space-y-6">
       <div className="card">
@@ -95,7 +121,7 @@ export default async function ImagesPage({
           <div>
             <p className="eyebrow">Image studio</p>
             <h1 className="h-display mt-1 text-3xl md:text-4xl">Branded visuals with a recorded cost.</h1>
-            <p className="prose-muted mt-1 max-w-2xl text-sm">Deterministic SVG visuals in the client palette. Attach one to a draft; alt text is required before scheduling.</p>
+            <p className="prose-muted mt-1 max-w-2xl text-sm">Deterministic SVG visuals guided by client brain &amp; founder memory. Platform-optimized ratios with built-in alt text verification.</p>
           </div>
           <a href={`/studio?client=${client.id}`} className="btn btn-sm">Content studio →</a>
         </div>
@@ -106,6 +132,12 @@ export default async function ImagesPage({
           <button className="btn btn-outline" type="submit">View</button>
           <span className="self-center text-xs text-muted-foreground">Images this month {used}/{limit.images}</span>
         </form>
+
+        <div className="mt-3 flex flex-wrap gap-1.5 pt-1 text-[11px]">
+          <span className="badge badge-accent">🧠 {approvedK.length} Brain Facts Grounding</span>
+          <span className="badge badge-muted">⚡ {approvedM.length} Founder Memories</span>
+          <span className="badge badge-muted">🎨 Platform-Ready: Square, Portrait, Twitter &amp; 9:16 Stories</span>
+        </div>
       </div>
 
       {searchParams.error && (
@@ -115,29 +147,71 @@ export default async function ImagesPage({
       )}
       {searchParams.message === "generated" && <p className="alert alert-warning">Image generated and saved. Attach it to a draft or download it below.</p>}
 
-      <div className="grid gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
-        <section className="card xl:sticky xl:top-4 xl:self-start">
-          <p className="eyebrow">Generate</p>
-          <h2 className="h-display mt-1 text-xl">New visual</h2>
-          <form action={generateImage.bind(null, client.id)} className="mt-3 space-y-3">
-            <div><label className="label" htmlFor="im-title">Internal title</label><input id="im-title" name="title" className="input" maxLength={140} placeholder="Open house quote card" /></div>
-            <div><label className="label" htmlFor="im-prompt">Visual prompt / headline</label><textarea id="im-prompt" name="prompt" className="input min-h-[90px]" required minLength={6} maxLength={400} placeholder="One clear line that earns the scroll." /></div>
-            <div>
-              <label className="label" htmlFor="im-aspect">Aspect</label>
-              <select id="im-aspect" name="aspect" className="input" defaultValue="square">
-                {Object.entries(IMAGE_ASPECTS).map(([key, val]) => <option key={key} value={key}>{val.label} · {val.w}×{val.h}</option>)}
-              </select>
+      <div className="grid gap-6 xl:grid-cols-[400px_minmax(0,1fr)]">
+        <section className="space-y-4 xl:sticky xl:top-4 xl:self-start">
+          <div className="card">
+            <p className="eyebrow">Generate</p>
+            <h2 className="h-display mt-1 text-xl">New visual</h2>
+            <form action={generateImage.bind(null, client.id)} className="mt-3 space-y-3">
+              <div>
+                <label className="label" htmlFor="im-title">Internal title</label>
+                <input id="im-title" name="title" className="input" defaultValue={defaultTitle} maxLength={140} placeholder="Open house quote card" />
+              </div>
+              <div>
+                <label className="label" htmlFor="im-prompt">Visual prompt / headline</label>
+                <textarea id="im-prompt" name="prompt" className="input min-h-[90px]" defaultValue={defaultPrompt} required minLength={6} maxLength={400} placeholder="One clear line that earns the scroll." />
+              </div>
+              <div>
+                <label className="label" htmlFor="im-style">Visual Style</label>
+                <select id="im-style" name="style" className="input" defaultValue={defaultStyle}>
+                  {Object.entries(IMAGE_STYLES).map(([key, val]) => (
+                    <option key={key} value={key}>{val.label} — {val.description}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="label" htmlFor="im-aspect">Aspect &amp; Platform</label>
+                <select id="im-aspect" name="aspect" className="input" defaultValue={defaultAspect}>
+                  {Object.entries(IMAGE_ASPECTS).map(([key, val]) => (
+                    <option key={key} value={key}>{val.label} · {val.w}×{val.h} ({val.channelHint})</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="label" htmlFor="im-asset">Attach to draft <span className="font-normal text-muted-foreground">(optional)</span></label>
+                <select id="im-asset" name="assetId" className="input" defaultValue="">
+                  <option value="">Do not attach</option>
+                  {assets.map((a) => <option key={a.id} value={a.id}>{a.title ?? "Untitled"} · {a.status.replace("_", " ")}</option>)}
+                </select>
+              </div>
+              <button className="btn btn-accent w-full" type="submit">Generate image · ${IMAGE_COST_USD.toFixed(2)}</button>
+              <p className="text-[11px] text-muted-foreground">Palette: {client.brandColor} + derived tones. Cost is logged as an estimated image event.</p>
+            </form>
+          </div>
+
+          {suggestions.length > 0 && (
+            <div className="card">
+              <p className="eyebrow">Brain &amp; Memory Suggestions</p>
+              <h3 className="h-display mt-0.5 text-sm font-semibold">Suggested Visual Concepts</h3>
+              <p className="prose-muted mt-0.5 text-xs">Grounded in verified client knowledge and founder memory. Click to load:</p>
+              <div className="mt-3 space-y-2">
+                {suggestions.map((s, idx) => (
+                  <a
+                    key={idx}
+                    href={`/images?client=${client.id}&title=${encodeURIComponent(s.title)}&prompt=${encodeURIComponent(s.prompt)}&aspect=${s.aspect}&style=${s.style}`}
+                    className="block rounded-lg border border-border bg-muted/40 p-2.5 text-xs transition hover:border-accent/60 hover:bg-accent/5"
+                  >
+                    <div className="flex items-center justify-between font-semibold text-foreground">
+                      <span>{s.title}</span>
+                      <span className="badge badge-muted !text-[10px]">{s.channelTag}</span>
+                    </div>
+                    <p className="mt-1 line-clamp-2 text-muted-foreground">{s.prompt}</p>
+                    <p className="mt-1 font-mono text-[10px] text-accent font-medium">Style: {IMAGE_STYLES[s.style]?.label}</p>
+                  </a>
+                ))}
+              </div>
             </div>
-            <div>
-              <label className="label" htmlFor="im-asset">Attach to draft <span className="font-normal text-muted-foreground">(optional)</span></label>
-              <select id="im-asset" name="assetId" className="input" defaultValue="">
-                <option value="">Do not attach</option>
-                {assets.map((a) => <option key={a.id} value={a.id}>{a.title ?? "Untitled"} · {a.status.replace("_", " ")}</option>)}
-              </select>
-            </div>
-            <button className="btn btn-accent w-full" type="submit">Generate image · ${IMAGE_COST_USD.toFixed(2)}</button>
-            <p className="text-[11px] text-muted-foreground">Palette: {client.brandColor} + derived tones. Cost is logged as an estimated image event.</p>
-          </form>
+          )}
         </section>
 
         <section className="space-y-3">
@@ -154,7 +228,7 @@ export default async function ImagesPage({
                   <img src={`/api/images/${image.id}/file`} alt={image.title ?? image.prompt} className="aspect-[4/3] w-full object-cover" />
                   <div className="p-3">
                     <p className="text-sm font-semibold leading-snug">{image.title ?? image.prompt}</p>
-                    <p className="mt-0.5 text-[11px] text-muted-foreground">{IMAGE_ASPECTS[image.aspect]?.label ?? image.aspect} · ${image.costUsd.toFixed(2)} · {new Date(image.createdAt).toLocaleDateString()}</p>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">{(IMAGE_ASPECTS as Record<string, { label: string }>)[image.aspect]?.label ?? image.aspect} · ${image.costUsd.toFixed(2)} · {new Date(image.createdAt).toLocaleDateString()}</p>
                     <a className="btn btn-outline btn-sm mt-2" href={`/api/images/${image.id}/file`} target="_blank" rel="noreferrer">Open SVG</a>
                   </div>
                 </div>

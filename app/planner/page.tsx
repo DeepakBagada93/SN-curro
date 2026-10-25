@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { loadDB, saveDB, audit, uid, nowIso } from "@/lib/store";
 import { CHANNEL_LABELS, PLAN_ITEM_STATUSES, PLAN_STATUS_BADGE, knowledgeStats } from "@/lib/clients";
 import { monthKey, monthLabel, shiftMonth } from "@/lib/agency";
-import { buildCalendarDrafts } from "@/lib/planner";
+import { buildCalendarDrafts, generateCalendarPlan } from "@/lib/planner";
 import { EmptyState } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
 import type { PlanItemStatus } from "@/lib/types";
@@ -50,7 +50,8 @@ async function generateCalendar(clientId: string, month: string) {
   const plan = await ensurePlan(db, clientId, month);
   const existing = db.planItems.filter((p) => p.planId === plan.id);
   if (existing.length > 0) redirect(`/planner?client=${clientId}&month=${month}&message=exists`);
-  const drafts = buildCalendarDrafts(client, knowledge, month);
+  const memory = db.memoryCards.filter((m) => m.status === "approved");
+  const drafts = await generateCalendarPlan({ client, knowledge, memory, month });
   const t = nowIso();
   for (const draft of drafts) {
     db.planItems.push({ id: uid("pi"), workspaceId: client.workspaceId, clientId, planId: plan.id, ...draft, createdAt: t, updatedAt: t });
@@ -141,6 +142,7 @@ export default async function PlannerPage({
     .sort((a, b) => a.publishDate.localeCompare(b.publishDate));
   const knowledge = db.knowledgeItems.filter((k) => k.clientId === client.id);
   const ks = knowledgeStats(knowledge);
+  const approvedMem = db.memoryCards.filter((m) => m.status === "approved");
   const scheduled = items.filter((i) => i.status === "scheduled").length;
   const published = items.filter((i) => i.status === "published").length;
 
@@ -177,6 +179,12 @@ export default async function PlannerPage({
           <div className="rounded-xl bg-muted/60 p-3"><dt className="text-[10px] uppercase tracking-wide text-muted-foreground">Scheduled</dt><dd className="font-display text-2xl font-semibold">{scheduled}</dd></div>
           <div className="rounded-xl bg-muted/60 p-3"><dt className="text-[10px] uppercase tracking-wide text-muted-foreground">Published</dt><dd className="font-display text-2xl font-semibold">{published}</dd></div>
         </dl>
+
+        <div className="mt-3 flex flex-wrap items-center gap-1.5 pt-1 text-[11px]">
+          <span className="badge badge-accent">🧠 {ks.approved} Brain Facts Grounding</span>
+          <span className="badge badge-muted">⚡ {approvedMem.length} Founder Memories Active</span>
+          <span className="badge badge-muted">📡 Multi-Channel: LinkedIn · X · Blog · IG Reels · Newsletter</span>
+        </div>
       </div>
 
       {searchParams.error && (

@@ -1,8 +1,13 @@
 import { z } from "zod";
-import type { AssetFormat, ClaimKind, Client, KnowledgeItem } from "./types";
+import type { AssetFormat, ClaimKind, Client, KnowledgeItem, MemoryCard } from "./types";
 import { chatText, extractJson, openRouterConfigured, type ModelTier } from "./openrouter";
 import { generateStudioDraft, type GeneratedStudioDraft } from "./studio";
 import { formatLabel } from "./agency";
+import {
+  PLATFORM_GUIDELINES,
+  auditDraftForQuality,
+  formatBrainAndMemoryPrompt
+} from "./platform-guidelines";
 
 const StudioOutputSchema = z.object({
   title: z.string().trim().min(3).max(200),
@@ -19,6 +24,7 @@ const StudioOutputSchema = z.object({
 export interface StudioGenerationInput {
   client: Client;
   knowledge: KnowledgeItem[];
+  memory?: MemoryCard[];
   format: AssetFormat;
   title?: string;
   brief?: string;
@@ -30,43 +36,47 @@ export async function generateStudioAsset(input: StudioGenerationInput): Promise
   const fallback = generateStudioDraft(input);
   if (!openRouterConfigured()) return { draft: fallback, model: "mock/studio-v1" };
 
-  const knowledgeBlock = input.knowledge
-    .map((k) => `- id=${k.id} | kind=${k.kind} | title=${k.title}\n  ${k.body.slice(0, 1200)}${k.sourceUrl ? `\n  source=${k.sourceUrl}` : ""}`)
-    .join("\n");
+  const guide = PLATFORM_GUIDELINES[input.format];
+  const brainAndMemoryPrompt = formatBrainAndMemoryPrompt(
+    input.client,
+    input.knowledge,
+    input.memory
+  );
   const tier = STRONG_FORMATS.includes(input.format) ? "strong" : "cheap";
 
   let lastError: unknown;
   for (const attemptTier of [tier] as ModelTier[]) {
     try {
-    const { text, model } = await chatText({
-      tier: attemptTier,
-      maxTokens: input.format === "seo_article" ? 4500 : input.format === "newsletter" || input.format === "reel_script" ? 3500 : 2800,
-      temperature: 0.5,
-      system: [
-        "You are a senior content strategist at an SEO/marketing agency writing for a specific client.",
-        input.format === "reel_script"
-          ? "Produce a 30–45 second vertical reel script with a 0–3s hook, timed beats, VOICEOVER and ON-SCREEN lines, and a final CTA. No shot can contain a claim that is not in the ledger."
-          : `Produce a ${formatLabel(input.format)}.`,
-        "Use ONLY the approved knowledge supplied. Never invent facts, statistics, dates, rankings, salaries or outcomes.",
-        "Every factual claim must cite at least one supplied knowledge id in sourceIds.",
-        "Include at least one owned opinion labelled opinion.",
-        "If you include an outcome claim with no source, label it unsupported and explain the fix in reviewNote.",
-        `Respect these restricted claims: ${input.client.restrictedClaims || "none stated"}.`,
-        "Reply with ONLY a JSON object, no markdown fences, matching:",
-        `{"title": string, "body": string, "claims": [{"text": string, "kind": "factual"|"opinion"|"unsupported", "sourceIds": string[], "reviewNote": string|null}], "qualityFlags": string[]}`
-      ].join(" "),
-      user: [
-        `CLIENT: ${input.client.name}`,
-        input.client.audience ? `AUDIENCE: ${input.client.audience}` : "",
-        input.client.tone ? `VOICE: ${input.client.tone}` : "",
-        input.client.summary ? `STRATEGY: ${input.client.summary}` : "",
-        input.brief ? `ANGLE / BRIEF: ${input.brief.slice(0, 600)}` : "",
-        input.title ? `WORKING TITLE: ${input.title}` : "",
-        "",
-        "APPROVED KNOWLEDGE (cite by id):",
-        knowledgeBlock
-      ].filter(Boolean).join("\n")
-    });
+      const { text, model } = await chatText({
+        tier: attemptTier,
+        maxTokens: input.format === "seo_article" ? 4500 : input.format === "newsletter" || input.format === "reel_script" ? 3500 : 2800,
+        temperature: 0.45,
+        system: [
+          "You are a master agency content strategist and editorial writer executing verified brand content.",
+          `FORMAT & CHANNEL: ${formatLabel(input.format)} (${guide ? guide.name : input.format}).`,
+          guide ? `PLATFORM HOOK RULE: ${guide.hookGuide}` : "",
+          guide ? `PLATFORM STRUCTURE RULE: ${guide.structureGuide}` : "",
+          guide ? `PLATFORM PACING & LENGTH: ${guide.pacingGuide} Target length: ${guide.charRange.optimal}.` : "",
+          guide ? `PLATFORM CTA RULE: ${guide.ctaGuide}` : "",
+          "ANTI-AI SYNTHETIC FILTER: Do NOT use generic AI filler words (e.g. 'delve into', 'game-changer', 'testament to', 'tapestry', 'unleash', 'crucial role', 'seamlessly', 'foster'). Write with 100% human-grade, concrete, clear engineering precision.",
+          "TRUTH & CLAIM LEDGER CONTRACT:",
+          "1. Use ONLY the approved Client Knowledge Brain supplied. Never invent facts, statistics, customer names, dates, or outcomes.",
+          "2. Every factual claim must cite at least one valid knowledge ID in sourceIds.",
+          "3. Include at least one owned opinion labelled 'opinion'. When available, ground it in the founder memory opinions provided.",
+          "4. If you include an outcome or comparative claim with no verified source, label it 'unsupported' and explain the fix in reviewNote.",
+          `5. STRICT COMPLIANCE: Respect restricted claims: ${input.client.restrictedClaims || "none stated"}.`,
+          "Reply with ONLY a JSON object, no markdown fences, matching:",
+          `{"title": string, "body": string, "claims": [{"text": string, "kind": "factual"|"opinion"|"unsupported", "sourceIds": string[], "reviewNote": string|null}], "qualityFlags": string[]}`
+        ].filter(Boolean).join("\n"),
+        user: [
+          brainAndMemoryPrompt,
+          "",
+          input.brief ? `SPECIFIC ANGLE / BRIEF: ${input.brief.slice(0, 600)}` : "",
+          input.title ? `WORKING TITLE: ${input.title}` : "",
+          `FORMAT TO PRODUCE: ${formatLabel(input.format)}`,
+          "Remember: Output strictly valid JSON."
+        ].filter(Boolean).join("\n")
+      });
 
     const parsed = StudioOutputSchema.parse(extractJson(text));
     const validIds = new Set(input.knowledge.map((k) => k.id));
@@ -87,12 +97,15 @@ export async function generateStudioAsset(input: StudioGenerationInput): Promise
       throw new Error("Model output had no cited factual claim.");
     }
 
+    const qualityAudit = auditDraftForQuality(parsed.body, input.client, input.format);
+    const combinedQualityFlags = Array.from(new Set([...parsed.qualityFlags, ...qualityAudit.qualityFlags]));
+
     return {
       draft: {
         title: parsed.title,
         body: parsed.body,
         claims,
-        qualityFlags: parsed.qualityFlags,
+        qualityFlags: combinedQualityFlags,
         promptTemplate: `studio-${input.format}-openrouter-v1`
       },
       model
